@@ -9,3 +9,19 @@
 body {
   @apply bg-slate-900 text-slate-100 min-h-screen;
 }
+
+/* パック開封のカードめくり演出 */
+@keyframes card-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.animate-card-reveal {
+  animation: card-reveal 0.45s ease-out both;
+}

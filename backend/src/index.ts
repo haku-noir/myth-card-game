@@ -4,6 +4,7 @@ import { createServer } from 'node:http'
 import { Server } from 'socket.io'
 import cardsRouter from './routes/cards.js'
 import decksRouter from './routes/decks.js'
+import packsRouter from './routes/packs.js'
 
 const app = express()
 app.use(cors())
@@ -15,6 +16,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/cards', cardsRouter)
 app.use('/api/decks', decksRouter)
+app.use('/api/packs', packsRouter)
 
 const httpServer = createServer(app)
 

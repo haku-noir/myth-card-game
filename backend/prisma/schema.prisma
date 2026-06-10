@@ -10,9 +10,10 @@ datasource db {
 }
 
 model SavedDeck {
-  id        Int      @id @default(autoincrement())
-  name      String
-  cardIds   String // JSON配列をシリアライズ: '["N01","N03",...]'
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          Int      @id @default(autoincrement())
+  name        String
+  cardIds     String // JSON配列をシリアライズ: '["N01","N03",...]'
+  poolCardIds String? // デッキ構築元の手持ちカード(開封した40枚)。編集時の選び直しに使う
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

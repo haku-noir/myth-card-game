@@ -11,18 +11,21 @@ async function handle<T>(res: Response): Promise<T> {
 export const fetchDecks = () =>
   fetch('/api/decks').then((r) => handle<SavedDeck[]>(r))
 
-export const createDeck = (name: string, cardIds: string[]) =>
+export const fetchDeck = (id: number) =>
+  fetch(`/api/decks/${id}`).then((r) => handle<SavedDeck>(r))
+
+export const createDeck = (name: string, cardIds: string[], poolCardIds?: string[]) =>
   fetch('/api/decks', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, cardIds }),
+    body: JSON.stringify({ name, cardIds, poolCardIds }),
   }).then((r) => handle<SavedDeck>(r))
 
-export const updateDeck = (id: number, name: string, cardIds: string[]) =>
+export const updateDeck = (id: number, name: string, cardIds: string[], poolCardIds?: string[]) =>
   fetch(`/api/decks/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, cardIds }),
+    body: JSON.stringify({ name, cardIds, poolCardIds }),
   }).then((r) => handle<SavedDeck>(r))
 
 export const deleteDeck = (id: number) =>

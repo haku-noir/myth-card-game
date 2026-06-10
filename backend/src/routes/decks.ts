@@ -9,17 +9,42 @@ const DECK_SIZE = 20
 const MAX_DECKS = 10
 const validIds = new Set(cards.map((c) => c.id))
 
-function validateDeck(name: unknown, cardIds: unknown): string | null {
+function validateDeck(name: unknown, cardIds: unknown, poolCardIds: unknown): string | null {
   if (typeof name !== 'string' || name.trim() === '') return 'デッキ名を指定してください'
   if (!Array.isArray(cardIds) || cardIds.length !== DECK_SIZE)
     return `デッキはちょうど${DECK_SIZE}枚である必要があります`
   if (!cardIds.every((id) => typeof id === 'string' && validIds.has(id)))
     return '不正なカードIDが含まれています'
+  if (poolCardIds !== undefined && poolCardIds !== null) {
+    if (!Array.isArray(poolCardIds) || !poolCardIds.every((id) => typeof id === 'string' && validIds.has(id)))
+      return '手持ちカードに不正なカードIDが含まれています'
+    // デッキはプールの部分集合(同名カードはプール内の枚数まで)であること
+    const poolCount = new Map<string, number>()
+    for (const id of poolCardIds) poolCount.set(id, (poolCount.get(id) ?? 0) + 1)
+    for (const id of cardIds) {
+      const rest = (poolCount.get(id) ?? 0) - 1
+      if (rest < 0) return 'デッキに手持ちカードにないカードが含まれています'
+      poolCount.set(id, rest)
+    }
+  }
   return null
 }
 
-function toResponse(deck: { id: number; name: string; cardIds: string; createdAt: Date; updatedAt: Date }) {
-  return { ...deck, cardIds: JSON.parse(deck.cardIds) as string[] }
+interface DeckRow {
+  id: number
+  name: string
+  cardIds: string
+  poolCardIds: string | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+function toResponse(deck: DeckRow) {
+  return {
+    ...deck,
+    cardIds: JSON.parse(deck.cardIds) as string[],
+    poolCardIds: deck.poolCardIds ? (JSON.parse(deck.poolCardIds) as string[]) : null,
+  }
 }
 
 // 一覧
@@ -28,10 +53,20 @@ router.get('/', async (_req, res) => {
   res.json(decks.map(toResponse))
 })
 
+// 1件取得
+router.get('/:id', async (req, res) => {
+  const deck = await prisma.savedDeck.findUnique({ where: { id: Number(req.params.id) } })
+  if (!deck) {
+    res.status(404).json({ error: 'デッキが見つかりません' })
+    return
+  }
+  res.json(toResponse(deck))
+})
+
 // 新規保存
 router.post('/', async (req, res) => {
-  const { name, cardIds } = req.body
-  const error = validateDeck(name, cardIds)
+  const { name, cardIds, poolCardIds } = req.body
+  const error = validateDeck(name, cardIds, poolCardIds)
   if (error) {
     res.status(400).json({ error })
     return
@@ -42,7 +77,11 @@ router.post('/', async (req, res) => {
     return
   }
   const deck = await prisma.savedDeck.create({
-    data: { name: (name as string).trim(), cardIds: JSON.stringify(cardIds) },
+    data: {
+      name: (name as string).trim(),
+      cardIds: JSON.stringify(cardIds),
+      poolCardIds: poolCardIds ? JSON.stringify(poolCardIds) : null,
+    },
   })
   res.status(201).json(toResponse(deck))
 })
@@ -50,8 +89,8 @@ router.post('/', async (req, res) => {
 // 更新
 router.put('/:id', async (req, res) => {
   const id = Number(req.params.id)
-  const { name, cardIds } = req.body
-  const error = validateDeck(name, cardIds)
+  const { name, cardIds, poolCardIds } = req.body
+  const error = validateDeck(name, cardIds, poolCardIds)
   if (error) {
     res.status(400).json({ error })
     return
@@ -63,7 +102,12 @@ router.put('/:id', async (req, res) => {
   }
   const deck = await prisma.savedDeck.update({
     where: { id },
-    data: { name: (name as string).trim(), cardIds: JSON.stringify(cardIds) },
+    data: {
+      name: (name as string).trim(),
+      cardIds: JSON.stringify(cardIds),
+      // 編集時にプール未指定なら既存値を維持する
+      ...(poolCardIds !== undefined && { poolCardIds: poolCardIds ? JSON.stringify(poolCardIds) : null }),
+    },
   })
   res.json(toResponse(deck))
 })
