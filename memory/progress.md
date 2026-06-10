@@ -16,7 +16,12 @@ metadata:
 - [x] Phase 1: 基盤構築 — 完了 (コミット 159a413)
   - Vite+React+TS+Tailwind / Express+TS+Prisma / docker-compose 疎通確認済み
   - create-vite最新版はNode 21非対応のため `npm create vite@5` を使用した
-- [ ] Phase 2: カード一覧 + デッキ保存
+- [x] Phase 2: カード一覧 + デッキ保存 — 完了 (コミット a62afd5)
+  - /cards(フィルター・検索・ソート・詳細モーダル)、/my-decks(CRUD)
+  - /api/decks CRUD一式(20枚固定・上限10デッキのバリデーション)動作確認済み
+  - 注意: PrismaはAlpine非互換 → backendはnode:20-slim + binaryTargets指定
+  - 注意: backendのnode_modulesは匿名ボリューム。依存変更時は
+    `docker compose up -d --force-recreate --renew-anon-volumes backend` が必要
 - [ ] Phase 3: パック開封 + デッキ構築
 - [ ] Phase 4: ゲームエンジン + CPU戦
 - [ ] Phase 5: PvP
