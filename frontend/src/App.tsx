@@ -4,6 +4,7 @@ import CardList from './pages/CardList'
 import MyDecks from './pages/MyDecks'
 import PackOpening from './pages/PackOpening'
 import DeckBuilder from './pages/DeckBuilder'
+import Game from './pages/Game'
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -24,7 +25,7 @@ export default function App() {
         <Route path="/deck-builder" element={<DeckBuilder />} />
         <Route path="/draft/sealed" element={<Placeholder title="シールド戦" />} />
         <Route path="/draft/booster" element={<Placeholder title="ブースタードラフト" />} />
-        <Route path="/game" element={<Placeholder title="ゲーム" />} />
+        <Route path="/game" element={<Game />} />
         <Route path="/result" element={<Placeholder title="結果" />} />
       </Routes>
     </BrowserRouter>

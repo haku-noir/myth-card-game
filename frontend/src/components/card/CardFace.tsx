@@ -17,8 +17,8 @@ const typeLabel: Record<Card['type'], string> = {
 interface Props {
   card: Card
   onClick?: () => void
-  /** sm: 一覧グリッド用 / md: 詳細・手札用 */
-  size?: 'sm' | 'md'
+  /** xs: フィールド用 / sm: 一覧グリッド用 / md: 詳細・手札用 */
+  size?: 'xs' | 'sm' | 'md'
 }
 
 /**
@@ -27,7 +27,8 @@ interface Props {
  */
 export default function CardFace({ card, onClick, size = 'sm' }: Props) {
   const [hasImage, setHasImage] = useState(true)
-  const sizeClass = size === 'sm' ? 'w-28 h-40 text-xs' : 'w-44 h-64 text-sm'
+  const sizeClass =
+    size === 'xs' ? 'w-20 h-28 text-[9px]' : size === 'sm' ? 'w-28 h-40 text-xs' : 'w-44 h-64 text-sm'
 
   return (
     <div
@@ -54,7 +55,7 @@ export default function CardFace({ card, onClick, size = 'sm' }: Props) {
           <span className="text-emerald-300">{typeLabel[card.type]}</span>
         )}
         <div className="mt-auto">
-          {card.effectText && (
+          {card.effectText && size !== 'xs' && (
             <p className="mb-1 line-clamp-3 text-[10px] leading-tight text-slate-200">
               {card.effectText}
             </p>
