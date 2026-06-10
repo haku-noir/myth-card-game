@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif;
+}
+
+body {
+  @apply bg-slate-900 text-slate-100 min-h-screen;
+}
