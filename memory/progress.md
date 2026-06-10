@@ -22,7 +22,10 @@ metadata:
   - 注意: PrismaはAlpine非互換 → backendはnode:20-slim + binaryTargets指定
   - 注意: backendのnode_modulesは匿名ボリューム。依存変更時は
     `docker compose up -d --force-recreate --renew-anon-volumes backend` が必要
-- [ ] Phase 3: パック開封 + デッキ構築
+- [x] Phase 3: パック開封 + デッキ構築 — 完了 (コミット d51d4e8)
+  - /api/packs/open(封入ルール・UR率1/4検証済み)、/pack-opening、/deck-builder
+  - SavedDeck.poolCardIds追加: デッキ編集時に元の40枚プールから選び直せる
+  - パック自由枠はN魔法・罠全7種からランダム(設計ドキュメントも修正済み)
 - [ ] Phase 4: ゲームエンジン + CPU戦
 - [ ] Phase 5: PvP
 - [ ] Phase 6: ドラフト
