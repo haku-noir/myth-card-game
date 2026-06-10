@@ -1,5 +1,7 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Home from './pages/Home'
+import CardList from './pages/CardList'
+import MyDecks from './pages/MyDecks'
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -14,8 +16,8 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/cards" element={<Placeholder title="カード一覧" />} />
-        <Route path="/my-decks" element={<Placeholder title="マイデッキ" />} />
+        <Route path="/cards" element={<CardList />} />
+        <Route path="/my-decks" element={<MyDecks />} />
         <Route path="/pack-opening" element={<Placeholder title="パック開封" />} />
         <Route path="/deck-builder" element={<Placeholder title="デッキ構築" />} />
         <Route path="/draft/sealed" element={<Placeholder title="シールド戦" />} />

@@ -1,5 +1,7 @@
 generator client {
   provider = "prisma-client-js"
+  // native: ホスト(macOS)用 / debian-openssl-3.0.x: Dockerコンテナ(node:20-slim)用
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
