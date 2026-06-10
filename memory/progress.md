@@ -26,7 +26,14 @@ metadata:
   - /api/packs/open(封入ルール・UR率1/4検証済み)、/pack-opening、/deck-builder
   - SavedDeck.poolCardIds追加: デッキ編集時に元の40枚プールから選び直せる
   - パック自由枠はN魔法・罠全7種からランダム(設計ドキュメントも修正済み)
-- [ ] Phase 4: ゲームエンジン + CPU戦
+- [x] Phase 4: ゲームエンジン + CPU戦 — 完了 (コミット 54ccdcd)
+  - engine/gameEngine.ts: 純粋関数+immer。pending機構(trapPrompt/effectTarget)で
+    罠割り込みと対象選択をUI/CPU共通のステートマシンにしている
+  - 検証は frontend/scripts/simulate.ts (CPU総当たり自動対戦)。
+    `npx tsx scripts/simulate.ts 500` で実行。エンジン変更時は必ず回すこと
+  - 注意: winner は PlayerIdx(0|1) なので truthy判定禁止。undefined比較を使う
+  - 課題(Phase 7で調整): 難易度間の勝率差が小さい(easy vs hard ≒ 48-52)。
+    シールド戦の引きの分散が大きいため。AI閾値のチューニング余地あり
 - [ ] Phase 5: PvP
 - [ ] Phase 6: ドラフト
 - [ ] Phase 7: 仕上げ
