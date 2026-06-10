@@ -33,5 +33,4 @@ Thumbs.db
 docker-volumes/
 
 # Claude Code (local only)
-memory/
 .claude/settings.local.json
