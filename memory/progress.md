@@ -34,7 +34,13 @@ metadata:
   - 注意: winner は PlayerIdx(0|1) なので truthy判定禁止。undefined比較を使う
   - 課題(Phase 7で調整): 難易度間の勝率差が小さい(easy vs hard ≒ 48-52)。
     シールド戦の引きの分散が大きいため。AI閾値のチューニング余地あり
-- [ ] Phase 5: PvP
+- [x] Phase 5: PvP — 完了 (コミット d15d54c)
+  - ホスト権威方式: サーバーは中継のみ、ホストクライアントがエンジン実行
+  - Board共通化(components/game/Board.tsx, mySeat+act(action)方式)
+  - 検証: frontend/scripts/pvp-smoke.ts (socket.io 2クライアントのヘッドレステスト)
+  - 既知の制限: ゲストもdevtoolsで相手手札を覗ける(friend-play前提で許容)
+  - 注意: macOSのDockerバインドマウントでtsx watchが変更を取りこぼすことがある。
+    backend更新が反映されない時は `docker compose restart backend`
 - [ ] Phase 6: ドラフト
 - [ ] Phase 7: 仕上げ
 
