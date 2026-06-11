@@ -36,14 +36,15 @@ interface Props {
  */
 export default function CardFace({ card, onClick, size = 'sm' }: Props) {
   const [hasImage, setHasImage] = useState(true)
+  // xsは固定サイズで効果文をクリップ(全文はホバープレビュー/詳細で見る)
   const sizeClass =
     size === 'xs'
-      ? 'w-20 min-h-28 text-[9px]'
+      ? 'w-20 h-28 text-[9px]'
       : size === 'sm'
         ? 'w-28 min-h-40 text-xs'
         : 'w-44 min-h-64 text-sm'
   const effectClass =
-    size === 'xs' ? 'text-[8px]' : size === 'sm' ? 'text-[10px]' : 'text-xs'
+    size === 'xs' ? 'text-[8px] line-clamp-2' : size === 'sm' ? 'text-[10px]' : 'text-xs'
 
   return (
     <div

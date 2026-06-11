@@ -225,9 +225,15 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
             }`}
           >
             {m && (
-              <div className={`relative ${m.position === 'defense' ? 'rotate-90' : ''}`}>
-                <CardFace card={m.card} size="xs" />
-                <BuffBadge m={m} />
+              <div className="group relative">
+                <div className={m.position === 'defense' ? 'rotate-90' : ''}>
+                  <CardFace card={m.card} size="xs" />
+                  <BuffBadge m={m} />
+                </div>
+                {/* ホバープレビュー(相手側は下方向に表示) */}
+                <div className="pointer-events-none absolute top-full left-1/2 z-30 mt-2 hidden -translate-x-1/2 group-hover:block">
+                  <CardFace card={m.card} size="sm" />
+                </div>
               </div>
             )}
           </div>
@@ -352,12 +358,18 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
             }`}
           >
             {m && (
-              <div className={`relative ${m.position === 'defense' ? 'rotate-90' : ''}`}>
-                <CardFace card={m.card} size="xs" />
-                <BuffBadge m={m} />
-                {m.hasAttacked && (
-                  <span className="absolute left-0 top-0 rounded bg-slate-900/80 px-1 text-[9px]">済</span>
-                )}
+              <div className="group relative">
+                <div className={`relative ${m.position === 'defense' ? 'rotate-90' : ''}`}>
+                  <CardFace card={m.card} size="xs" />
+                  <BuffBadge m={m} />
+                  {m.hasAttacked && (
+                    <span className="absolute left-0 top-0 rounded bg-slate-900/80 px-1 text-[9px]">済</span>
+                  )}
+                </div>
+                {/* ホバープレビュー(自分側は上方向に表示) */}
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 group-hover:block">
+                  <CardFace card={m.card} size="sm" />
+                </div>
               </div>
             )}
           </div>
