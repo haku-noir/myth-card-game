@@ -15,7 +15,7 @@ import {
 } from '../../engine/gameEngine'
 import type { Card } from '../../types/card'
 import type { GameAction } from '../../types/actions'
-import type { FieldMonster, GameState, PlayerIdx, TargetOption } from '../../types/game'
+import type { BattleContext, FieldMonster, GameState, PlayerIdx, TargetOption } from '../../types/game'
 import CardFace from '../card/CardFace'
 import CardBack from '../card/CardBack'
 import Modal from '../common/Modal'
@@ -316,16 +316,23 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
         <p className="text-center text-sm text-red-300">攻撃対象を選択してください</p>
       )}
 
-      {/* 自分の伏せ */}
+      {/* 自分の伏せ(ホバーでカード表示、クリックで詳細) */}
       <div className="flex justify-center gap-2">
         {me.traps.map((t, z) => (
           <div key={z} className={`flex h-16 w-24 items-center justify-center rounded ${t ? '' : 'border border-dashed border-slate-800'}`}>
             {t && (
-              <div className="relative" title={t.card.name}>
+              <div
+                className="group relative cursor-pointer"
+                onClick={() => setDetail(t.card)}
+              >
                 <CardBack size="xs" />
                 <span className="absolute -bottom-1 left-0 right-0 rounded bg-black/80 text-center text-[9px] text-slate-300">
                   {t.card.name}
                 </span>
+                {/* ホバープレビュー */}
+                <div className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 hidden -translate-x-1/2 group-hover:block">
+                  <CardFace card={t.card} size="sm" />
+                </div>
               </div>
             )}
           </div>
@@ -560,6 +567,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
         {pending?.kind === 'attackerBoost' && pending.forPlayer === mySeat && (
           <div>
             <p className="mb-1 font-semibold">戦闘強化(任意)</p>
+            <BattleInfo game={game} mySeat={mySeat} battle={pending.battle} />
             <p className="mb-3 text-sm text-slate-400">
               手札のモンスター1枚を捨てて、攻撃力を「捨てたモンスターの星×100」上げられます(この戦闘の間)
             </p>
@@ -590,12 +598,8 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
       <Modal open={pending?.kind === 'defenderReaction' && pending.forPlayer === mySeat} onClose={() => {}} peekable>
         {pending?.kind === 'defenderReaction' && pending.forPlayer === mySeat && (
           <div className="max-w-2xl">
-            <p className="mb-1 font-semibold">
-              {opp.name}の攻撃宣言
-              {pending.battle.attackerBoost > 0 && (
-                <span className="text-orange-400">(戦闘強化+{pending.battle.attackerBoost}!)</span>
-              )}
-            </p>
+            <p className="mb-1 font-semibold">{opp.name}の攻撃宣言</p>
+            <BattleInfo game={game} mySeat={mySeat} battle={pending.battle} />
             <p className="mb-3 text-sm text-slate-400">
               罠の発動 または 戦闘強化(手札を捨てて星×100加算)の<b>どちらか一方</b>を行えます
             </p>
@@ -706,6 +710,79 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** 戦闘中の両モンスターと実効値(バフ・戦闘強化込み)の表示 */
+function BattleInfo({ game, mySeat, battle }: { game: GameState; mySeat: PlayerIdx; battle: BattleContext }) {
+  const attackerOwner = game.turnPlayer
+  const defenderOwner = other(attackerOwner)
+  const attacker = game.players[attackerOwner].monsters[battle.attackerZone]
+  const defMon = battle.target !== 'direct' ? game.players[defenderOwner].monsters[battle.target] : null
+  if (!attacker) return null
+
+  const renderSide = (
+    label: string,
+    isMine: boolean,
+    m: FieldMonster,
+    mode: 'attack' | 'defense',
+    boost: number,
+  ) => {
+    const base = mode === 'attack' ? (m.card.atk ?? 0) : (m.card.def ?? 0)
+    const buffSum = mode === 'attack' ? m.buffs.reduce((s, b) => s + b.amount, 0) : 0
+    const total = Math.max(0, base + buffSum) + boost
+    return (
+      <div className="flex flex-col items-center gap-1">
+        <span className={`text-xs font-semibold ${isMine ? 'text-emerald-300' : 'text-red-300'}`}>
+          {label}
+        </span>
+        <CardFace card={m.card} size="xs" />
+        <span className="font-mono text-sm font-bold">
+          {mode === 'attack' ? '攻' : '守'}
+          {total}
+        </span>
+        {(buffSum !== 0 || boost > 0) && (
+          <span className="text-[10px] text-slate-400">
+            基礎{base}
+            {buffSum !== 0 && (
+              <span className={buffSum > 0 ? 'text-emerald-400' : 'text-red-400'}>
+                {' '}
+                バフ{buffSum > 0 ? `+${buffSum}` : buffSum}
+              </span>
+            )}
+            {boost > 0 && <span className="text-orange-400"> 強化+{boost}</span>}
+          </span>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="mb-3 flex items-center justify-center gap-4 rounded-lg bg-slate-900/60 p-3">
+      {renderSide(
+        `攻撃側: ${game.players[attackerOwner].name}`,
+        attackerOwner === mySeat,
+        attacker,
+        'attack',
+        battle.attackerBoost,
+      )}
+      <span className="text-2xl text-red-400">⚔</span>
+      {defMon ? (
+        renderSide(
+          `防御側: ${game.players[defenderOwner].name}`,
+          defenderOwner === mySeat,
+          defMon,
+          defMon.position,
+          battle.defenderBoost,
+        )
+      ) : (
+        <div className="flex flex-col items-center gap-1">
+          <span className="text-xs font-semibold text-red-300">直接攻撃!</span>
+          <span className="text-3xl">💥</span>
+          <span className="font-mono text-sm">{game.players[defenderOwner].name}のライフへ</span>
         </div>
       )}
     </div>
