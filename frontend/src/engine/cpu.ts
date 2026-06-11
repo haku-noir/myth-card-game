@@ -184,6 +184,7 @@ export function nextMainAction(s: GameState, me: PlayerIdx, diff: Difficulty): C
 /**
  * 召喚判断(v1.2: 1ターン1回・ぴったりブースト)。
  * 通常召喚の最良とブースト召喚の最良を比較して決める。
+ * 倒しようのない大型が相手にいる場合は守備表示の壁を優先する。
  */
 function decideSummon(s: GameState, me: PlayerIdx, diff: Difficulty): CpuMainAction | null {
   const p = s.players[me]
@@ -217,6 +218,22 @@ function decideSummon(s: GameState, me: PlayerIdx, diff: Difficulty): CpuMainAct
     }
   }
 
+  // 壁モード(普通・難): ブースト込みでも相手の最大打点に600以上届かないなら、
+  // 攻撃表示で出しても殴られてライフを失うだけ。守備力最大のモンスターを壁にする
+  const oppBest = bestAtk(s, other(me))
+  if (diff !== 'easy' && bestNormal) {
+    const maxSummonAtk = Math.max(bestNormal.atk, bestBoost?.atk ?? 0)
+    if (oppBest >= maxSummonAtk + 600) {
+      let wall: { handIdx: number; def: number } | null = null
+      for (let i = 0; i < p.hand.length; i++) {
+        if (!canSummon(s, i)) continue
+        const def = p.hand[i].def ?? 0
+        if (!wall || def > wall.def) wall = { handIdx: i, def }
+      }
+      if (wall) return { type: 'summon', handIdx: wall.handIdx, position: 'defense' }
+    }
+  }
+
   // 比較: ブーストは純益が閾値以上、かつ通常召喚より強い時のみ
   const boostThreshold = diff === 'hard' ? 300 : 500
   if (
@@ -231,7 +248,6 @@ function decideSummon(s: GameState, me: PlayerIdx, diff: Difficulty): CpuMainAct
 
   // 表示形式: 守勢(ライフ少・相手が強い)なら守備の固いカードを壁に
   const card = p.hand[bestNormal.handIdx]
-  const oppBest = bestAtk(s, other(me))
   const defensive =
     diff !== 'easy' &&
     p.life <= 3000 &&
@@ -275,8 +291,18 @@ export function nextAttack(
     return { attackerZone: attackers[0].zone, target: 'direct' }
   }
 
-  // 難は戦闘強化込みの打点で攻撃可否を判断する
-  const boostReach = diff === 'hard' ? maxCheapBoost(s, me) : 0
+  // --- 難: 返り討ち回避ロジック ---
+  // 相手が手札(戦闘強化)や伏せ罠でリアクションできるかは公開情報から判断する
+  const oppTrapCount = opp.traps.filter(Boolean).length
+  const oppCanBoost = opp.hand.length > 0
+  const oppCanReact = oppCanBoost || oppTrapCount > 0
+  // 安全マージン: 600差なら相手は★7を捨てないと返せない。伏せがある時は砂かけ婆(-600)を見て700
+  const safeMargin = oppTrapCount > 0 ? 700 : 600
+  // 「強化込みで攻撃」が許されるのは相手にリアクション手段がない時だけ
+  const planBoost = diff === 'hard' ? maxCheapBoost(s, me) : 0
+  // デッキ切れ間際で膠着が不利なら、慎重さを捨てて攻める
+  const myDeck = s.players[me].deck.length
+  const desperate = myDeck <= 6 && myDeck <= opp.deck.length + 1
 
   for (const { m: attacker, zone } of attackers) {
     const atk = atkOf(attacker)
@@ -287,22 +313,38 @@ export function nextAttack(
       const isMedusa = defender.card.id === 'R08'
       if (diff === 'hard' && isMedusa && atk >= 2000) continue
 
-      if (defender.position === 'attack') {
-        const dAtk = atkOf(defender)
-        if (atk > dAtk) {
-          const score = (atk - dAtk) + dAtk * 0.5
-          if (!best || score > best.score) best = { target: t, score }
-        } else if (atk + boostReach > dAtk && boostReach > 0) {
-          // 強化込みなら勝てる(実際の強化はdecideBoostが行う)
-          const score = dAtk * 0.4
-          if (!best || score > best.score) best = { target: t, score }
-        } else if (atk === dAtk && diff !== 'easy' && dAtk >= 1500) {
-          if (!best || dAtk * 0.3 > best.score) best = { target: t, score: dAtk * 0.3 }
+      const dValue = defender.position === 'attack' ? atkOf(defender) : (defender.card.def ?? 0)
+      // 除去価値(攻撃表示は与ダメも加点)
+      const score =
+        defender.position === 'attack' ? (atk - dValue) + dValue * 0.5 : dValue * 0.4
+
+      if (diff === 'hard') {
+        if (!oppCanReact || desperate) {
+          // 相手がリアクション不能、または膠着がデッキ切れ負けに繋がる状況:
+          // 素で勝てる、または強化込みで勝てるなら攻撃
+          if (atk > dValue || (planBoost > 0 && atk + planBoost > dValue)) {
+            if (!best || score > best.score) best = { target: t, score }
+          }
+        } else {
+          // 相手はリアクション可能: 返り討ちを警戒する
+          const margin = atk - dValue
+          const ok =
+            margin >= safeMargin || // 十分な打点差(ひっくり返すには★6〜7の犠牲が必要)
+            (planBoost > 0 && margin + planBoost >= safeMargin) || // 自分の強化で安全圏へ(decideBoostが実行)
+            (margin > 0 && opp.hand.length <= 1 && oppTrapCount === 0) // 相手の対抗手段がほぼ無い
+          if (ok && (!best || score > best.score)) best = { target: t, score }
+          // 打点差がほとんどない相手には攻撃しない(返り討ち・相打ち回避)
         }
       } else {
-        const dDef = defender.card.def ?? 0
-        if (atk > dDef) {
-          const score = dDef * 0.4
+        // 易・普通: 従来どおり素の値で勝てる時のみ
+        if (defender.position === 'attack') {
+          const dAtk = dValue
+          if (atk > dAtk) {
+            if (!best || score > best.score) best = { target: t, score }
+          } else if (atk === dAtk && diff !== 'easy' && dAtk >= 1500) {
+            if (!best || dAtk * 0.3 > best.score) best = { target: t, score: dAtk * 0.3 }
+          }
+        } else if (atk > dValue) {
           if (!best || score > best.score) best = { target: t, score }
         }
       }
@@ -356,10 +398,41 @@ export function decideBoost(s: GameState, me: PlayerIdx, diff: Difficulty): numb
   const defender = s.players[oppIdx].monsters[battle.target]
   if (!defender) return null
   const defValue = defender.position === 'attack' ? atkOf(defender) : (defender.card.def ?? 0)
+  const margin = atk - defValue
 
-  if (atk > defValue) return null // すでに勝っている
+  if (diff === 'hard') {
+    // 難: 相手のリアクション(手札強化・伏せ罠)を見越して安全マージンを確保する。
+    // nextAttackがこの強化を前提に攻撃宣言している
+    const oppTrapCount = s.players[oppIdx].traps.filter(Boolean).length
+    const oppCanReact = s.players[oppIdx].hand.length > 0 || oppTrapCount > 0
+    const myDeck = p.deck.length
+    const desperate = myDeck <= 6 && myDeck <= s.players[oppIdx].deck.length + 1
+    if (!oppCanReact || desperate) {
+      // リアクション不能: 素で勝てるなら温存、負けているなら最小コストで逆転
+      if (margin > 0) return null
+      for (const c of candidates) {
+        if (atk + c.value > defValue) return c.handIdx
+      }
+      return null
+    }
+    const safeMargin = oppTrapCount > 0 ? 700 : 600
+    if (margin >= safeMargin) return null // すでに安全圏
+    // safeMarginに届く最小コストの強化を探す
+    for (const c of candidates) {
+      if (margin + c.value >= safeMargin) return c.handIdx
+    }
+    // 届かないがせめて勝てるようにする(宣言済みの攻撃を無駄にしない)
+    if (margin <= 0) {
+      for (const c of candidates) {
+        if (atk + c.value > defValue) return c.handIdx
+      }
+    }
+    return null
+  }
 
-  // 負け・相打ちの状況: 安いカードでひっくり返せるなら強化
+  if (margin > 0) return null // すでに勝っている
+
+  // 易・普通: 負け・相打ちの状況なら安いカードでひっくり返す
   for (const c of candidates) {
     if (atk + c.value > defValue) {
       // 易は★2以下(または鬼火)しか切らない
