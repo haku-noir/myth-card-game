@@ -481,7 +481,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
       </Modal>
 
       {/* 罠発動確認(自分の罠) */}
-      <Modal open={pending?.kind === 'trapPrompt' && pending.forPlayer === mySeat} onClose={() => {}}>
+      <Modal open={pending?.kind === 'trapPrompt' && pending.forPlayer === mySeat} onClose={() => {}} peekable>
         {pending?.kind === 'trapPrompt' && pending.forPlayer === mySeat && (
           <div>
             <p className="mb-3 font-semibold">{opp.name}がモンスターを召喚しました。罠を発動しますか?</p>
@@ -512,7 +512,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
       </Modal>
 
       {/* 効果対象選択(墓地・デッキ・手札のモーダル系) */}
-      <Modal open={!!modalTargetPending} onClose={() => {}}>
+      <Modal open={!!modalTargetPending} onClose={() => {}} peekable>
         {pending?.kind === 'effectTarget' && pending.forPlayer === mySeat && (
           <div>
             <p className="mb-3 font-semibold">
@@ -556,7 +556,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
       )}
 
       {/* 攻撃側の戦闘強化(自分が攻撃側) */}
-      <Modal open={pending?.kind === 'attackerBoost' && pending.forPlayer === mySeat} onClose={() => {}}>
+      <Modal open={pending?.kind === 'attackerBoost' && pending.forPlayer === mySeat} onClose={() => {}} peekable>
         {pending?.kind === 'attackerBoost' && pending.forPlayer === mySeat && (
           <div>
             <p className="mb-1 font-semibold">戦闘強化(任意)</p>
@@ -587,7 +587,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
       </Modal>
 
       {/* 防御側リアクション(罠 or 戦闘強化の二者択一) */}
-      <Modal open={pending?.kind === 'defenderReaction' && pending.forPlayer === mySeat} onClose={() => {}}>
+      <Modal open={pending?.kind === 'defenderReaction' && pending.forPlayer === mySeat} onClose={() => {}} peekable>
         {pending?.kind === 'defenderReaction' && pending.forPlayer === mySeat && (
           <div className="max-w-2xl">
             <p className="mb-1 font-semibold">
