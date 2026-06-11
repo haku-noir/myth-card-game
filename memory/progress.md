@@ -41,7 +41,10 @@ metadata:
   - 既知の制限: ゲストもdevtoolsで相手手札を覗ける(friend-play前提で許容)
   - 注意: macOSのDockerバインドマウントでtsx watchが変更を取りこぼすことがある。
     backend更新が反映されない時は `docker compose restart backend`
-- [ ] Phase 6: ドラフト
+- [x] Phase 6: ドラフト — 完了 (コミット a1c038b)
+  - ルーム基盤を3モード(pvp/sealed/booster)対応に拡張
+  - ブースタードラフトはサーバー権威(4ラウンド×10ピック=40枚→20枚構築)
+  - 検証: frontend/scripts/draft-smoke.ts
 - [ ] Phase 7: 仕上げ
 
 ## 環境メモ
