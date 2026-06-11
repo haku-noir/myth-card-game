@@ -11,8 +11,8 @@ const menuItems = [
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-8 p-8">
-      <h1 className="text-4xl font-bold tracking-wide">レベル&リリース</h1>
-      <p className="text-slate-400">神話カードゲーム(仮称)</p>
+      <h1 className="text-4xl font-bold tracking-wide">星の階</h1>
+      <p className="text-slate-400">ほしのきざはし ― パック開封型カードゲーム</p>
       <nav className="flex w-full max-w-md flex-col gap-3">
         {menuItems.map((item) => (
           <Link
