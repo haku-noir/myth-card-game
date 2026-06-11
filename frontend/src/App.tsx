@@ -5,14 +5,7 @@ import MyDecks from './pages/MyDecks'
 import PackOpening from './pages/PackOpening'
 import DeckBuilder from './pages/DeckBuilder'
 import Game from './pages/Game'
-
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-2xl text-slate-400">{title}(実装予定)</p>
-    </div>
-  )
-}
+import Draft from './pages/Draft'
 
 export default function App() {
   return (
@@ -23,10 +16,10 @@ export default function App() {
         <Route path="/my-decks" element={<MyDecks />} />
         <Route path="/pack-opening" element={<PackOpening />} />
         <Route path="/deck-builder" element={<DeckBuilder />} />
-        <Route path="/draft/sealed" element={<Placeholder title="シールド戦" />} />
-        <Route path="/draft/booster" element={<Placeholder title="ブースタードラフト" />} />
+        <Route path="/draft" element={<Draft />} />
+        <Route path="/draft/sealed" element={<Draft />} />
+        <Route path="/draft/booster" element={<Draft />} />
         <Route path="/game" element={<Game />} />
-        <Route path="/result" element={<Placeholder title="結果" />} />
       </Routes>
     </BrowserRouter>
   )

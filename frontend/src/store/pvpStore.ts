@@ -7,28 +7,50 @@ import type { Card } from '../types/card'
 import type { GameAction } from '../types/actions'
 import type { GameState, PlayerIdx } from '../types/game'
 
-type PvpStatus = 'idle' | 'waiting' | 'deckSelect' | 'playing' | 'opponentLeft'
+export type RoomMode = 'pvp' | 'sealed' | 'booster'
+
+type PvpStatus =
+  | 'idle'
+  | 'waiting' // 相手の参加待ち
+  | 'deckSelect' // デッキ準備(PvP=保存デッキ選択 / sealed=開封構築)
+  | 'drafting' // ブースタードラフト中
+  | 'building' // ドラフト後の構築
+  | 'playing'
+  | 'opponentLeft'
 
 interface Ack {
   ok: boolean
   error?: string
   roomId?: string
   seat?: number
+  mode?: RoomMode
+}
+
+interface DraftView {
+  round: number
+  totalRounds: number
+  pack: Card[]
+  pickedCount: number
+  waiting: boolean
 }
 
 interface PvpStore {
   socket: Socket | null
   status: PvpStatus
+  mode: RoomMode
   roomId: string
   mySeat: PlayerIdx
   names: string[]
   readyStates: boolean[]
   myDeckReady: boolean
   game: GameState | null
+  draft: DraftView | null
+  draftedCardIds: string[]
   error: string
 
-  createRoom: (playerName: string) => void
+  createRoom: (playerName: string, mode: RoomMode) => void
   joinRoom: (roomId: string, playerName: string) => void
+  pickCard: (cardIndex: number) => void
   submitDeck: (cardIds: string[]) => void
   act: (action: GameAction) => void
   leave: () => void
@@ -41,11 +63,37 @@ export const usePvpStore = create<PvpStore>((set, get) => {
     const socket = io({ path: '/socket.io' })
 
     socket.on('pvp:players', ({ names }: { names: string[] }) => {
-      set({ names, status: names.length >= 2 ? 'deckSelect' : 'waiting' })
+      const { mode, status } = get()
+      // ドラフトはdraft:packイベント側で遷移するため、ここではPvP/シールドのみ
+      if (status === 'playing' || status === 'drafting' || status === 'building') {
+        set({ names })
+        return
+      }
+      const full = names.length >= 2
+      set({ names, status: full ? (mode === 'booster' ? 'drafting' : 'deckSelect') : 'waiting' })
     })
 
     socket.on('pvp:ready_status', ({ ready }: { ready: boolean[] }) => {
       set({ readyStates: ready })
+    })
+
+    socket.on(
+      'draft:pack',
+      ({ round, totalRounds, cards, pickedCount }: { round: number; totalRounds: number; cards: Card[]; pickedCount: number }) => {
+        set({
+          status: 'drafting',
+          draft: { round, totalRounds, pack: cards, pickedCount, waiting: false },
+        })
+      },
+    )
+
+    socket.on('draft:wait', ({ pickedCount }: { pickedCount: number }) => {
+      const d = get().draft
+      if (d) set({ draft: { ...d, pickedCount, waiting: true } })
+    })
+
+    socket.on('draft:complete', ({ cardIds }: { cardIds: string[] }) => {
+      set({ status: 'building', draftedCardIds: cardIds, draft: null })
     })
 
     // ホストのみ受信: 全員準備完了→ゲーム生成して配信
@@ -91,19 +139,29 @@ export const usePvpStore = create<PvpStore>((set, get) => {
   return {
     socket: null,
     status: 'idle',
+    mode: 'pvp',
     roomId: '',
     mySeat: 0,
     names: [],
     readyStates: [],
     myDeckReady: false,
     game: null,
+    draft: null,
+    draftedCardIds: [],
     error: '',
 
-    createRoom: (playerName) => {
+    createRoom: (playerName, mode) => {
       const socket = ensureSocket()
-      socket.emit('pvp:create_room', { playerName }, (ack: Ack) => {
+      socket.emit('pvp:create_room', { playerName, mode }, (ack: Ack) => {
         if (ack.ok && ack.roomId !== undefined) {
-          set({ roomId: ack.roomId, mySeat: 0, status: 'waiting', names: [playerName], error: '' })
+          set({
+            roomId: ack.roomId,
+            mySeat: 0,
+            mode: ack.mode ?? mode,
+            status: 'waiting',
+            names: [playerName],
+            error: '',
+          })
         } else {
           set({ error: ack.error ?? 'ルーム作成に失敗しました' })
         }
@@ -114,11 +172,20 @@ export const usePvpStore = create<PvpStore>((set, get) => {
       const socket = ensureSocket()
       socket.emit('pvp:join_room', { roomId, playerName }, (ack: Ack) => {
         if (ack.ok && ack.roomId !== undefined) {
-          set({ roomId: ack.roomId, mySeat: (ack.seat ?? 1) as PlayerIdx, error: '' })
+          set({
+            roomId: ack.roomId,
+            mySeat: (ack.seat ?? 1) as PlayerIdx,
+            mode: ack.mode ?? 'pvp',
+            error: '',
+          })
         } else {
           set({ error: ack.error ?? '参加に失敗しました' })
         }
       })
+    },
+
+    pickCard: (cardIndex) => {
+      get().socket?.emit('draft:pick', { cardIndex })
     },
 
     submitDeck: (cardIds) => {
@@ -153,12 +220,15 @@ export const usePvpStore = create<PvpStore>((set, get) => {
       set({
         socket: null,
         status: 'idle',
+        mode: 'pvp',
         roomId: '',
         mySeat: 0,
         names: [],
         readyStates: [],
         myDeckReady: false,
         game: null,
+        draft: null,
+        draftedCardIds: [],
         error: '',
       })
     },

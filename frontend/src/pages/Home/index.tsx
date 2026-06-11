@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 const menuItems = [
   { to: '/game?mode=cpu', label: 'CPU戦を始める', desc: 'コンピュータと対戦' },
   { to: '/game?mode=pvp', label: 'PvP対戦', desc: 'ルームコードで友達と対戦' },
-  { to: '/draft/booster', label: 'ドラフト', desc: 'シールド戦・ブースタードラフト' },
+  { to: '/draft', label: 'ドラフト', desc: 'シールド戦・ブースタードラフト' },
   { to: '/my-decks', label: 'マイデッキ', desc: '保存したデッキの管理' },
   { to: '/cards', label: 'カード一覧', desc: '全48種のカードを確認' },
 ]

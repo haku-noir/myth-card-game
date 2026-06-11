@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { fetchDecks } from '../../api/decks'
 import { openPacks } from '../../api/packs'
 import { cardById } from '../../data/cards'
@@ -193,7 +193,7 @@ function PvpLobby() {
         <div className="rounded-lg bg-slate-800 p-4">
           <h2 className="mb-3 font-semibold">ルームを作る</h2>
           <button
-            onClick={() => pvp.createRoom(name.trim() || 'プレイヤー1')}
+            onClick={() => pvp.createRoom(name.trim() || 'プレイヤー1', 'pvp')}
             className="w-full rounded bg-indigo-600 py-3 font-semibold hover:bg-indigo-500"
           >
             ルーム作成
@@ -287,6 +287,9 @@ function PvpLobby() {
 function PvpGame() {
   const navigate = useNavigate()
   const pvp = usePvpStore()
+
+  // ドラフト形式のルームに参加した場合はドラフト画面へ
+  if (pvp.status !== 'idle' && pvp.mode !== 'pvp') return <Navigate to="/draft" replace />
 
   if (pvp.status !== 'playing' || !pvp.game) return <PvpLobby />
 
