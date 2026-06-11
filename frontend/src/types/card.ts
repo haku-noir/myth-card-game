@@ -10,4 +10,6 @@ export interface Card {
   atk?: number
   def?: number
   effectText: string // 効果なし = ""
+  /** 可変星モンスター(化け狸・鵺): リリース時のみこの範囲の好きな星として扱える */
+  releaseStarRange?: { min: number; max: number }
 }

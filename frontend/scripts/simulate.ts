@@ -21,13 +21,14 @@ import { decideTarget, decideTrap, nextAttack, nextMainAction } from '../src/eng
 import type { Card } from '../src/types/card'
 import type { Difficulty, GameState, PlayerIdx } from '../src/types/game'
 
-// パック生成(backend/packService.tsと同じロジックの簡易版)
+// パック生成(backend/packService.tsと同じロジックの簡易版・v1.4)
 const N_MONSTERS = CARDS.filter((c) => c.rarity === 'N' && c.type === 'monster')
-const ANSWERS = CARDS.filter((c) => ['N19', 'N21', 'N22', 'N24', 'N25'].includes(c.id))
+const ANSWERS = CARDS.filter((c) => ['N21', 'N24', 'N22', 'N27', 'N28'].includes(c.id))
+const MIRACLES = CARDS.filter((c) => ['UR4', 'UR5'].includes(c.id))
 const N_SPELLS = CARDS.filter((c) => c.rarity === 'N' && c.type !== 'monster')
 const R_CARDS = CARDS.filter((c) => c.rarity === 'R')
 const SR_CARDS = CARDS.filter((c) => c.rarity === 'SR')
-const UR_CARDS = CARDS.filter((c) => c.rarity === 'UR')
+const UR_GODS = CARDS.filter((c) => c.rarity === 'UR' && c.type === 'monster')
 const pick = <T,>(arr: T[]) => arr[Math.floor(Math.random() * arr.length)]
 
 function randomPool(): Card[] {
@@ -35,9 +36,9 @@ function randomPool(): Card[] {
   for (let p = 0; p < 4; p++) {
     for (let i = 0; i < 5; i++) pool.push(pick(N_MONSTERS))
     pool.push(pick(N_SPELLS))
-    pool.push(pick(ANSWERS))
+    pool.push(Math.random() < 1 / 16 ? pick(MIRACLES) : pick(ANSWERS))
     pool.push(pick(R_CARDS), pick(R_CARDS))
-    pool.push(Math.random() < 0.25 ? pick(UR_CARDS) : pick(SR_CARDS))
+    pool.push(Math.random() < 0.25 ? pick(UR_GODS) : pick(SR_CARDS))
   }
   return pool
 }

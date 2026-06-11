@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>星の階(ほしのきざはし)― パック開封型カードゲーム</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#171320; --mat:#211b2e; --panel:#2a2338;
+  --washi:#f1e8d7; --washi2:#e7dcc4; --ink:#241f1c;
+  --shu:#cd3f2e; --ai:#3a5d8f; --kin:#c8a23a; --kin2:#e8d28a;
+  --mute:#9b93a8; --line:#3d3450; --ok:#5a9e6f;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--bg); color:var(--washi);
+  font-family:"Shippori Mincho","Hiragino Mincho ProN","Yu Mincho",serif;
+  font-size:14px; line-height:1.6;
+  background-image:radial-gradient(ellipse at 50% -10%, #2a2240 0%, var(--bg) 60%);
+  min-height:100vh;
+}
+#app{max-width:760px;margin:0 auto;padding:10px 10px 90px}
+button{
+  font-family:inherit; cursor:pointer; border:1px solid var(--line);
+  background:var(--panel); color:var(--washi); border-radius:8px;
+  padding:9px 16px; font-size:14px; font-weight:700; transition:.15s;
+}
+button:hover{border-color:var(--kin); color:var(--kin2)}
+button:disabled{opacity:.35; cursor:default}
+button.primary{background:var(--shu); border-color:#e0604e; color:#fff}
+button.primary:hover{filter:brightness(1.12); color:#fff}
+button.gold{background:linear-gradient(135deg,#9c7c20,#c8a23a); border-color:var(--kin2); color:#1d1505}
+h1,h2,h3{font-weight:800; letter-spacing:.06em}
+
+/* ---------- タイトル ---------- */
+.title-screen{display:flex;flex-direction:column;align-items:center;gap:14px;padding:48px 8px;text-align:center}
+.ttl-eyebrow{color:var(--mute);letter-spacing:.35em;font-size:12px}
+.ttl-main{font-size:64px;line-height:1.15;background:linear-gradient(180deg,#f7eecf 20%,var(--kin) 90%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 0 36px rgba(200,162,58,.25)}
+.ttl-sub{color:var(--mute);font-size:13px;margin-bottom:14px}
+.ttl-ladder{display:flex;gap:6px;font-size:20px;margin:2px 0 16px}
+.ttl-ladder span{color:#4a3f62}
+.ttl-ladder span.on{color:var(--kin);text-shadow:0 0 10px rgba(200,162,58,.6)}
+.title-screen button{width:min(320px,90%);padding:13px}
+
+/* ---------- カード ---------- */
+.card{
+  position:relative; width:78px; height:108px; border-radius:7px;
+  background:linear-gradient(165deg,var(--washi) 0%,var(--washi2) 100%);
+  color:var(--ink); border:2px solid #a59c8a; padding:5px 4px 4px;
+  display:flex; flex-direction:column; user-select:none; flex:none;
+  box-shadow:0 2px 5px rgba(0,0,0,.45); text-align:center;
+}
+.card.clickable{cursor:pointer}
+.card.clickable:hover{transform:translateY(-3px); box-shadow:0 6px 12px rgba(0,0,0,.5)}
+.card .rtag{position:absolute;top:2px;right:3px;font-size:9px;font-weight:800;letter-spacing:.02em}
+.card .cname{font-size:10.5px;font-weight:800;line-height:1.25;margin-top:8px;letter-spacing:-.02em}
+.card .cstars{font-size:9px;color:#8a6d1d;letter-spacing:-1px;margin-top:1px;min-height:12px}
+.card .ckind{font-size:9px;margin-top:1px;color:#555}
+.card .cstat{margin-top:auto;font-size:10px;font-weight:800;background:rgba(36,31,28,.08);border-radius:4px;padding:1px 0}
+.card.rar-N{border-color:#a59c8a}.card.rar-N .rtag{color:#857c6b}
+.card.rar-R{border-color:var(--ai)}.card.rar-R .rtag{color:var(--ai)}
+.card.rar-SR{border-color:var(--shu)}.card.rar-SR .rtag{color:var(--shu)}
+.card.rar-UR{border-color:var(--kin);background:linear-gradient(160deg,#f9efcd,#eedfa8);box-shadow:0 0 12px rgba(200,162,58,.55)}
+.card.rar-UR .rtag{color:#8a6d1d}
+.card.facedown{background:repeating-linear-gradient(45deg,#3a3050,#3a3050 6px,#322946 6px,#322946 12px);border-color:#544a72}
+.card.facedown .cname{color:#bfb6d6;margin-top:32px;font-size:9px}
+.card.sel{outline:3px solid var(--kin); outline-offset:1px}
+.card.tgt{outline:3px solid var(--shu); outline-offset:1px; cursor:pointer; animation:pulse 1s infinite}
+.card.def{transform:rotate(90deg) scale(.86)}
+.card.def.clickable:hover{transform:rotate(90deg) scale(.9)}
+.card .pbadge{position:absolute;left:2px;top:2px;font-size:9px;background:var(--ai);color:#fff;border-radius:3px;padding:0 3px;z-index:2}
+.card .pbadge.atk{background:var(--shu)}
+.card .used{position:absolute;inset:0;background:rgba(20,16,28,.45);border-radius:5px}
+@keyframes pulse{50%{outline-color:#ffb199}}
+@keyframes reveal{from{opacity:0;transform:translateY(10px) scale(.92)}to{opacity:1;transform:none}}
+.card.anim{animation:reveal .4s both}
+
+/* ---------- 開封・構築 ---------- */
+.grid{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;margin:14px 0}
+.section-h{display:flex;align-items:baseline;gap:10px;margin:18px 2px 6px;border-bottom:1px solid var(--line);padding-bottom:5px}
+.section-h h2{font-size:17px}
+.section-h .sub{color:var(--mute);font-size:12px}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.counter{font-size:18px;font-weight:800;color:var(--kin2)}
+
+/* ---------- 構築リスト ---------- */
+.blist{display:flex;flex-direction:column;gap:6px;margin:8px 0}
+.brow{background:var(--mat);border:1px solid var(--line);border-left-width:5px;border-radius:8px;padding:7px 11px;cursor:pointer;transition:.12s}
+.brow:hover{border-color:var(--kin)}
+.brow.sel{outline:2px solid var(--kin);background:#2e2740}
+.brow .bhead{display:flex;gap:9px;align-items:baseline;flex-wrap:wrap}
+.brow .brar{font-size:11px;font-weight:800;letter-spacing:.05em}
+.brow .bname{font-weight:800;font-size:14px}
+.brow .bmeta{color:var(--mute);font-size:12px;margin-left:auto}
+.brow .btext{color:#b9b1cc;font-size:12px;margin-top:2px;line-height:1.5}
+.brow.sel .btext{color:#e4def0}
+.rb-N{border-left-color:#a59c8a}.rb-N .brar{color:#a59c8a}
+.rb-R{border-left-color:var(--ai)}.rb-R .brar{color:#7da3d8}
+.rb-SR{border-left-color:var(--shu)}.rb-SR .brar{color:#e0604e}
+.rb-UR{border-left-color:var(--kin)}.rb-UR .brar{color:var(--kin2)}
+
+/* ---------- 対戦 ---------- */
+.pinfo{display:flex;align-items:center;gap:12px;background:var(--mat);border:1px solid var(--line);border-radius:10px;padding:7px 12px;margin:6px 0;flex-wrap:wrap}
+.pinfo .pname{font-weight:800;font-size:15px}
+.pinfo .life{font-size:19px;font-weight:800;color:#ff8d7a;min-width:64px}
+.pinfo .meta{color:var(--mute);font-size:12px}
+.ladder{display:flex;gap:2px;font-size:15px;letter-spacing:0}
+.ladder span{color:#4a3f62}.ladder span.on{color:var(--kin)}
+.fieldrow{display:flex;gap:8px;justify-content:center;min-height:118px;align-items:center;background:rgba(0,0,0,.18);border-radius:10px;padding:8px 4px;margin:5px 0;flex-wrap:wrap}
+.fieldrow.traps{min-height:64px}
+.fieldrow.traps .card{width:46px;height:62px}
+.fieldrow.traps .card .cname{margin-top:10px;font-size:8px}
+.fieldrow.traps .card .cstars,.fieldrow.traps .card .ckind,.fieldrow.traps .card .cstat{display:none}
+.fieldrow .empty{color:#4a4060;font-size:11px;letter-spacing:.2em}
+.handrow{display:flex;gap:7px;overflow-x:auto;padding:10px 6px;background:rgba(0,0,0,.25);border-radius:10px;margin:6px 0}
+.phasebar{position:fixed;left:0;right:0;bottom:0;background:rgba(23,19,32,.96);border-top:1px solid var(--line);padding:9px 10px;display:flex;gap:8px;justify-content:center;align-items:center;flex-wrap:wrap;z-index:40;backdrop-filter:blur(4px)}
+.phasebar .pinfo-mini{color:var(--kin2);font-weight:800;font-size:13px}
+.logbox{background:#120f1a;border:1px solid var(--line);border-radius:10px;padding:8px 12px;height:120px;overflow-y:auto;font-size:12px;color:#cfc8de;margin:6px 0}
+.logbox div{padding:1px 0;border-bottom:1px dotted #262038}
+.logbox .sysline{color:var(--kin2);font-weight:700}
+.boostchip{background:var(--kin);color:#1d1505;border-radius:99px;padding:2px 10px;font-weight:800;font-size:12px}
+
+/* ---------- モーダル ---------- */
+.overlay{position:fixed;inset:0;background:rgba(10,8,16,.78);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+.modal{background:var(--mat);border:1px solid var(--kin);border-radius:14px;max-width:440px;width:100%;max-height:84vh;overflow-y:auto;padding:18px;box-shadow:0 10px 50px rgba(0,0,0,.7)}
+.modal h3{color:var(--kin2);margin-bottom:10px;font-size:16px}
+.modal .mbody{color:#d8d1e6;font-size:13px;margin-bottom:12px;white-space:pre-wrap}
+.modal .opts{display:flex;flex-direction:column;gap:7px}
+.modal .opts button{text-align:left;padding:10px 13px}
+.modal .opts button .osub{display:block;font-weight:500;color:var(--mute);font-size:11px}
+.modal .cancelrow{margin-top:12px;text-align:center}
+
+/* ---------- シミュレーション ---------- */
+table.stats{width:100%;border-collapse:collapse;margin:12px 0;font-size:13px}
+table.stats th,table.stats td{border:1px solid var(--line);padding:7px 10px;text-align:left}
+table.stats th{background:var(--panel);color:var(--kin2);font-weight:700;width:55%}
+.note{color:var(--mute);font-size:12px;margin-top:8px}
+.center{text-align:center}
+@media(max-width:480px){
+  .card{width:64px;height:90px}
+  .card .cname{font-size:9px}
+  .ttl-main{font-size:46px}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+"use strict";
+/* =====================================================
+   星の階 ― ルールエンジン(DOM非依存・Node検証可)
+   ===================================================== */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const rnd = n => Math.floor(Math.random() * n);
+const pick = a => a[rnd(a.length)];
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=rnd(i+1);[a[i],a[j]]=[a[j],a[i]];} return a; }
+
+// ---------- カードデータベース(48種) ----------
+const C=(id,name,rar,kind,star,atk,def,fx,text)=>({id,name,rar,kind,star,atk,def,fx,text});
+const CARDS=[
+C('n01','一寸法師','N','M',1,500,300,null,''),
+C('n02','コロポックル','N','M',1,400,400,null,''),
+C('n03','鬼火','N','M',1,600,100,'pyre','戦闘強化として攻撃側が捨てる場合、+100ではなく+1000として扱う。'),
+C('n04','豆狸','N','M',1,200,600,null,''),
+C('n05','座敷童子','N','M',1,300,200,'zashiki','召喚時、カードを1枚ドローする。'),
+C('n06','河童','N','M',2,700,700,null,''),
+C('n07','金太郎','N','M',2,900,500,null,''),
+C('n08','人魚姫','N','M',2,700,800,null,''),
+C('n09','ろくろ首','N','M',2,500,900,null,''),
+C('n10','ぬりかべ','N','M',2,100,1200,'wallgift','戦闘強化として守備表示の自分モンスターのために捨てる場合、+800として扱う。'),
+C('n11','雪女','N','M',2,500,700,'freeze','召喚時、相手モンスター1体を守備表示にできる。'),
+C('n12','桃太郎','N','M',3,1300,800,null,''),
+C('n13','天狗','N','M',3,1200,900,null,''),
+C('n14','一つ目小僧','N','M',3,1100,1000,null,''),
+C('n15','ケンタウロス','N','M',3,1200,1100,null,''),
+C('n16','一反木綿','N','M',3,1100,600,null,''),
+C('n17','卑弥呼','N','M',3,800,800,'himiko','召喚時、相手の伏せカード1枚を確認できる。'),
+C('n18','浦島太郎','N','M',3,800,800,'urashima','召喚時、自分の墓地のカード1枚を手札に戻せる。'),
+C('n19','鬼退治','SR','S',0,0,0,'oni','相手モンスター1体を破壊する。'),
+C('n20','草薙剣','N','S',0,0,0,'kusanagi','自分のモンスター1体の攻撃力を、次の相手ターンの終了時まで+500する。'),
+C('n27','神便鬼毒酒','N','S',0,0,0,'dokushu','相手モンスター1体の攻撃力を、次の相手ターンの終了時まで-700する。'),
+C('n28','砂かけ婆','N','T',0,0,0,'sunakake','相手の攻撃宣言時に発動。攻撃モンスターの攻撃力をターン終了時まで-600する。'),
+C('n29','お焚き上げ','N','S',0,0,0,'otakiage','このターン、自分の戦闘強化で加算される値は2倍になる。'),
+C('n21','払い清め','N','S',0,0,0,'harai','相手の伏せカード1枚を破壊する。'),
+C('n22','死者の声','N','S',0,0,0,'shisha','自分の場にモンスターがいない場合のみ発動可能。自分の墓地からモンスター1体を守備表示で場に出す。'),
+C('n23','軍配','N','S',0,0,0,'gunbai','自分の場の全モンスターの攻撃力をターン終了時まで+300する。'),
+C('n24','金縛り','N','T',0,0,0,'kanashibari','相手の攻撃宣言時に発動。その攻撃を無効にする。'),
+C('n25','神隠し','R','T',0,0,0,'kamikakushi','相手の攻撃宣言時に発動。攻撃モンスター1体を持ち主の手札に戻す。'),
+C('r01','ミノタウロス','R','M',4,1700,1200,null,''),
+C('r02','源義経','R','M',4,1700,900,null,''),
+C('r03','グリフォン','R','M',4,1600,1400,null,''),
+C('r04','安倍晴明','R','M',4,1300,1000,'seimei','召喚時、自分のデッキから魔法・罠カード1枚を手札に加えられる。'),
+C('r05','宮本武蔵','R','M',5,1900,1300,null,''),
+C('r06','武蔵坊弁慶','R','M',5,1500,1900,null,''),
+C('r07','九尾の狐','R','M',5,1500,1200,'freeze','召喚時、相手モンスター1体を守備表示にできる。'),
+C('r08','メデューサ','R','M',5,1300,1400,'medusa','このカードと戦闘を行ったモンスターは、ターン終了時に破壊される。'),
+C('r09','強制送還','R','S',0,0,0,'bounce','相手モンスター1体を持ち主の手札に戻す。'),
+C('r10','人魚の肉','R','S',0,0,0,'heal','自分のライフを1500回復する。'),
+C('r11','落とし穴','SR','T',0,0,0,'pitfall','相手がモンスターを召喚した時に発動。そのモンスターを破壊する。'),
+C('r12','背水の陣','R','T',0,0,0,'haisui','自分の場が空の時、相手の攻撃宣言時に発動。手札からモンスター1体をレベル無視で場に出し、攻撃はそのモンスターに向かう。'),
+C('sr1','サイクロプス','SR','M',6,2300,1300,null,''),
+C('sr2','ケルベロス','SR','M',6,2100,1700,null,''),
+C('sr3','織田信長','SR','M',6,2000,1500,'nobunaga','召喚時、相手の伏せカード1枚を破壊できる。'),
+C('sr4','アマテラス','SR','M',7,2500,2100,null,''),
+C('sr5','ヴァルキリー','SR','M',7,2200,1800,'valkyrie','召喚時、自分の墓地の★3以下のモンスター1体を場に出せる。'),
+C('sr6','天罰','UR','S',0,0,0,'tenbatsu','相手の場のモンスターを全て破壊する。'),
+C('sr7','黄泉返り','SR','S',0,0,0,'yomigaeri','自分の墓地からモンスター1体をレベルを無視して場に出す。'),
+C('sr8','アイギスの盾','UR','T',0,0,0,'aegis','相手の攻撃宣言時に発動。相手の場の攻撃表示モンスターを全て破壊する。'),
+C('n26','化け狸','N','M',2,500,500,'wild13','リリースする場合、星1〜3の好きな値として扱える。'),
+C('r13','鵺','R','M',4,1200,1000,'wild15','リリースする場合、星1〜5の好きな値として扱える。'),
+C('ur1','ゼウス','UR','M',8,3000,2500,null,''),
+C('ur2','オーディン','UR','M',8,2900,2700,null,''),
+C('ur3','ヤマタノオロチ','UR','M',8,2800,2800,null,''),
+];
+const byId = id => CARDS.find(c=>c.id===id);
+function sacRange(c){ if(c.fx==='wild13')return[1,2,3]; if(c.fx==='wild15')return[1,2,3,4,5]; return [c.star]; }
+const ANSWERS = ['n21','n24','n22','n27','n28'];
+const ST_SCORE = {tenbatsu:100,aegis:95,oni:90,pitfall:85,bounce:80,kamikakushi:75,kanashibari:70,yomigaeri:65,dokushu:62,sunakake:58,harai:50,haisui:48,shisha:42,otakiage:36,gunbai:35,kusanagi:34,heal:25};
+const cardValue = c => c.kind==='M' ? c.atk + c.def*0.3 : (ST_SCORE[c.fx]||0)*22;
+
+// ---------- パック生成・自動構築 ----------
+let _uid=0;
+const clone = c => Object.assign({}, c, {uid:++_uid});
+function genPack(){
+  const NM = CARDS.filter(c=>c.rar==='N'&&c.kind==='M');
+  const NST = CARDS.filter(c=>c.rar==='N'&&c.kind!=='M');
+  const R = CARDS.filter(c=>c.rar==='R');
+  const SR = CARDS.filter(c=>c.rar==='SR');
+  const UR = CARDS.filter(c=>c.rar==='UR');
+  const out=[];
+  for(let i=0;i<5;i++) out.push(pick(NM));
+  out.push(pick(NST));
+  { const acts=CARDS.filter(c=>c.rar==='UR'&&c.kind!=='M');
+    if(Math.random()<1/16&&acts.length) out.push(pick(acts)); // 神の御業(隠しレア)
+    else out.push(byId(pick(ANSWERS))); }       // 「答え」確定スロット
+  out.push(pick(R)); out.push(pick(R));
+  out.push(Math.random()<0.25 ? pick(UR.filter(c=>c.kind==='M')) : pick(SR));
+  return out.map(clone);
+}
+function genPool(){ let p=[]; for(let i=0;i<4;i++) p=p.concat(genPack()); return p; }
+
+function aiBuildDeck(pool){
+  const M = pool.filter(c=>c.kind==='M');
+  const ST = pool.filter(c=>c.kind!=='M').slice()
+    .sort((a,b)=>(ST_SCORE[b.fx]||0)-(ST_SCORE[a.fx]||0));
+  const st = ST.slice(0, Math.min(7, ST.length));
+  const used = new Set(st.map(c=>c.uid));
+  const deck = st.slice();
+  for(const c of M){ if(String(c.fx||'').startsWith('wild') && deck.length<20 && !used.has(c.uid)){ deck.push(c); used.add(c.uid); } }
+  const lows = M.filter(c=>c.star<=3).sort((a,b)=>cardValue(b)-cardValue(a));
+  for(const c of lows.slice(0,5)){ if(deck.length<20){ deck.push(c); used.add(c.uid);} }
+  const rest = M.filter(c=>!used.has(c.uid)).sort((a,b)=>cardValue(b)-cardValue(a));
+  for(const c of rest){ if(deck.length>=20) break; deck.push(c); used.add(c.uid); }
+  for(const c of ST){ if(deck.length>=20) break; if(!used.has(c.uid)){ deck.push(c); used.add(c.uid);} }
+  return deck.slice(0,20);
+}
+
+// ---------- ゲームエンジン ----------
+class Game{
+  constructor(deck0, deck1, names){
+    this.p=[this._mkP(deck0,names?names[0]:'先攻'), this._mkP(deck1,names?names[1]:'後攻')];
+    this.p[0].level=0; this.p[1].level=1;       // 後攻はレベル2スタート(ターン開始時+1)
+    this.cur=0; this.turnNo=0; this.over=false; this.winner=-1; this.reason='';
+    this.stats={ur:[0,0],boost:[0,0],disc:[0,0]};
+    this.logs=[]; this.onUpdate=null; this.paceMs=0;
+  }
+  _mkP(deck,name){
+    return {name, deck:shuffle(deck.slice()), hand:[], mons:[], traps:[], grave:[],
+            life:8000, level:0, boost:0, turnCount:0, agent:null};
+  }
+  start(){ for(const p of this.p) for(let i=0;i<5;i++) p.hand.push(p.deck.pop()); }
+  log(m,sys){ this.logs.push({m,sys:!!sys}); if(this.logs.length>200) this.logs.shift(); }
+  async upd(){ if(this.onUpdate) this.onUpdate();
+    if(this.paceMs && this.p[this.cur].agent && this.p[this.cur].agent.isAi) await sleep(this.paceMs); }
+  matk(m){ const b=(m.buffs||[]).reduce((s,x)=>s+x.v,0); return Math.max(0, m.c.atk + b); }
+
+  async run(){
+    while(!this.over && this.turnNo<80) await this.takeTurn();
+    if(!this.over){ this.over=true; this.winner=-1; this.reason='ターン上限'; }
+  }
+
+  async takeTurn(){
+    this.turnNo++;
+    const pi=this.cur, p=this.p[pi];
+    p.turnCount++; p.level++; p.boost=0;
+    p.mons.forEach(m=>{m.attacked=false; m.posChanged=false;}); p.summonUsed=false; p.pumpMul=1;
+    this.log('―― '+p.name+'のターン'+p.turnCount+'(レベル'+p.level+')――',true);
+    if(p.deck.length===0){ this.gameEnd(1-pi,'デッキ切れ'); return; }
+    p.hand.push(p.deck.pop());
+    this.log(p.name+'はカードをドローした');
+    await this.upd();
+    // メインフェイズ
+    let res='end';
+    const battleOk = !(pi===0 && p.turnCount===1);
+    if(p.agent.isAi){ await aiMain(this,pi); res='battle'; }
+    else res = await p.agent.mainPhase(battleOk);
+    if(this.over) return;
+    // バトルフェイズ(先攻の第1ターンを除く)
+    if(battleOk && res==='battle'){
+      this.log(p.name+'のバトルフェイズ',true); await this.upd();
+      if(p.agent.isAi) await aiBattle(this,pi);
+      else await p.agent.battlePhase();
+    }
+    if(this.over) return;
+    // エンド処理
+    for(const q of this.p) for(const mm of q.mons) mm.buffs=(mm.buffs||[]).filter(b=>b.until>this.turnNo);
+    for(const q of this.p) for(const m of q.mons.slice())
+      if(m.medusa){ this.destroy(q,m); this.log(m.c.name+'は石化により砕け散った!'); }
+    p.boost=0;
+    this.cur=1-pi;
+    await this.upd();
+  }
+
+  canSummon(pi,c){ const p=this.p[pi];
+    if(c.kind!=='M'||p.mons.length>=5||p.summonUsed) return false;
+    return c.star <= p.level; }
+
+  async summon(pi,c,pos){
+    const p=this.p[pi]; const idx=p.hand.indexOf(c);
+    if(idx<0 || !this.canSummon(pi,c)) return false;
+    p.hand.splice(idx,1);
+    const m={c,pos,tmp:0,buffs:[],attacked:false,posChanged:true,medusa:false};
+    p.mons.push(m);
+    p.summonUsed=true;
+    this.log(p.name+'は'+c.name+'(★'+c.star+')を'+(pos==='ATK'?'攻撃':'守備')+'表示で召喚');
+    if(c.rar==='UR'){ this.stats.ur[pi]++; this.log('★8の神が降臨した……!',true); }
+    await this.upd();
+    await this.onSummonFx(pi,m);
+    if(!this.over && p.mons.includes(m))
+      await this.trapWindow(1-pi,{type:'summon',monster:m,pi});
+    return true;
+  }
+
+  async boostSummon(pi,sac,fromField,target,pos){
+    const p=this.p[pi];
+    if(p.summonUsed||p.mons.length>=5) return false;
+    if(!target||target.kind!=='M'||p.hand.indexOf(target)<0) return false;
+    const sc=fromField?sac.c:sac;
+    const need=target.star-p.level;
+    if(need<1||sacRange(sc).indexOf(need)<0) return false;
+    if(fromField){ const i=p.mons.indexOf(sac); if(i<0)return false;
+      p.mons.splice(i,1); p.grave.push(sac.c);
+      this.log(p.name+'は場の'+sac.c.name+'(★'+sac.c.star+')をリリース'); }
+    else { if(sac===target)return false; const i=p.hand.indexOf(sac); if(i<0)return false;
+      p.hand.splice(i,1); p.grave.push(sac);
+      this.log(p.name+'は手札の'+sac.name+'(★'+sac.star+')をリリース'); }
+    const hi=p.hand.indexOf(target); p.hand.splice(hi,1);
+    const m={c:target,pos:pos||'ATK',tmp:0,buffs:[],attacked:false,posChanged:true,medusa:false};
+    p.mons.push(m);
+    p.summonUsed=true; this.stats.boost[pi]++;
+    this.log(p.name+'はブースト召喚! レベル'+p.level+'+★'+need+'=★'+target.star+'ぴったり! '+target.name+'が降り立つ!',true);
+    if(target.rar==='UR'){ this.stats.ur[pi]++; this.log('★8の神が降臨した……!',true); }
+    await this.upd();
+    await this.onSummonFx(pi,m);
+    if(!this.over && p.mons.includes(m))
+      await this.trapWindow(1-pi,{type:'summon',monster:m,pi});
+    return true;
+  }
+
+  changePos(pi,m){
+    if(m.posChanged||m.attacked) return false;
+    m.pos = m.pos==='ATK'?'DEF':'ATK'; m.posChanged=true;
+    this.log(this.p[pi].name+'は'+m.c.name+'を'+(m.pos==='ATK'?'攻撃':'守備')+'表示に変更');
+    return true;
+  }
+
+  canCast(pi,c){
+    const p=this.p[pi], o=this.p[1-pi];
+    if(c.kind==='T') return p.traps.length<3;
+    if(c.kind!=='S') return false;
+    switch(c.fx){
+      case 'oni': case 'bounce': case 'tenbatsu': return o.mons.length>0;
+      case 'kusanagi': case 'gunbai': return p.mons.length>0;
+      case 'harai': return o.traps.length>0;
+      case 'shisha': return p.mons.length===0 && p.grave.some(x=>x.kind==='M');
+      case 'yomigaeri': return p.mons.length<5 && p.grave.some(x=>x.kind==='M');
+      case 'heal': return true;
+      case 'dokushu': return o.mons.length>0;
+      case 'otakiage': return p.hand.some(x=>x.kind==='M');
+    }
+    return false;
+  }
+
+  async setTrapOp(pi,c){
+    const p=this.p[pi]; const idx=p.hand.indexOf(c);
+    if(idx<0||p.traps.length>=3) return false;
+    p.hand.splice(idx,1);
+    p.traps.push({c,setTurn:this.turnNo,revealed:false});
+    this.log(p.name+'はカードを1枚伏せた');
+    await this.upd();
+    return true;
+  }
+
+  async cast(pi,c){
+    const p=this.p[pi], o=this.p[1-pi], ag=p.agent;
+    if(p.hand.indexOf(c)<0 || !this.canCast(pi,c)) return false;
+    let commit=null;
+    switch(c.fx){
+      case 'oni':{
+        const t=await ag.choose(o.mons.map(m=>({label:m.c.name+'(攻'+this.matk(m)+'/守'+m.c.def+')',value:m,score:this.matk(m)+(m.pos==='ATK'?300:0)})),'破壊するモンスターを選択',{optional:true});
+        if(t==null) return false;
+        commit=()=>{ this.destroy(o,t); this.log('「鬼退治」発動! '+t.c.name+'を破壊!'); };
+        break; }
+      case 'bounce':{
+        const t=await ag.choose(o.mons.map(m=>({label:m.c.name+'(攻'+this.matk(m)+')',value:m,score:this.matk(m)+m.c.star*100})),'手札に戻すモンスターを選択',{optional:true});
+        if(t==null) return false;
+        commit=()=>{ const i=o.mons.indexOf(t); if(i>=0){o.mons.splice(i,1); o.hand.push(t.c);} this.log('「強制送還」発動! '+t.c.name+'は手札に戻された!'); };
+        break; }
+      case 'kusanagi':{
+        const items=p.mons.map(m=>{
+          let sc=0;
+          for(const D of o.mons) if(D.pos==='ATK'&&this.matk(m)<this.matk(D)&&this.matk(D)<=this.matk(m)+500) sc=Math.max(sc,this.matk(D));
+          if(o.mons.length===0&&m.pos==='ATK') sc=Math.max(sc,300);
+          return {label:m.c.name+'(攻'+this.matk(m)+'→'+(this.matk(m)+500)+')',value:m,score:sc};
+        });
+        const t=await ag.choose(items,'強化するモンスターを選択',{optional:true});
+        if(t==null) return false;
+        commit=()=>{ t.buffs.push({v:500,until:this.turnNo+1}); this.log('「草薙剣」発動! '+t.c.name+'の攻撃力+500(次の相手ターン終了時まで)!'); };
+        break; }
+      case 'harai':{
+        const t=await ag.choose(o.traps.map(tr=>({label:tr.revealed?'伏せカード('+tr.c.name+')':'伏せカード',value:tr,score:tr.revealed?120:100})),'破壊する伏せカードを選択',{optional:true});
+        if(t==null) return false;
+        commit=()=>{ const i=o.traps.indexOf(t); if(i>=0){o.traps.splice(i,1); o.grave.push(t.c);} this.log('「払い清め」発動! 伏せられていた「'+t.c.name+'」を破壊!'); };
+        break; }
+      case 'shisha':{
+        const t=await ag.choose(p.grave.filter(x=>x.kind==='M').map(g=>({label:g.name+'(攻'+g.atk+'/守'+g.def+')',value:g,score:Math.max(g.atk,g.def)})),'墓地から場に出すモンスターを選択',{optional:true});
+        if(t==null) return false;
+        commit=()=>{ p.grave.splice(p.grave.indexOf(t),1);
+          p.mons.push({c:t,pos:'DEF',tmp:0,buffs:[],attacked:true,posChanged:true,medusa:false});
+          this.log('「死者の声」発動! '+t.name+'が守備表示で蘇った!'); };
+        break; }
+      case 'gunbai':
+        commit=()=>{ p.mons.forEach(m=>m.buffs.push({v:300,until:this.turnNo})); this.log('「軍配」発動! 全軍の攻撃力+300!'); };
+        break;
+      case 'tenbatsu':
+        commit=()=>{ const names=o.mons.map(m=>m.c.name).join('、');
+          for(const m of o.mons.slice()) this.destroy(o,m);
+          this.log('「天罰」発動! '+names+'を全て破壊!!',true); };
+        break;
+      case 'yomigaeri':{
+        const t=await ag.choose(p.grave.filter(x=>x.kind==='M').map(g=>({label:g.name+'(攻'+g.atk+'/守'+g.def+')',value:g,score:g.atk})),'墓地から場に出すモンスターを選択',{optional:true});
+        if(t==null) return false;
+        commit=()=>{ p.grave.splice(p.grave.indexOf(t),1);
+          const pos=t.atk>=t.def?'ATK':'DEF';
+          p.mons.push({c:t,pos,tmp:0,buffs:[],attacked:false,posChanged:true,medusa:false});
+          this.log('「黄泉返り」発動! '+t.name+'が'+(pos==='ATK'?'攻撃':'守備')+'表示で蘇った!',true); };
+        break; }
+      case 'dokushu':{
+        const t2=await ag.choose(o.mons.map(m=>({label:m.c.name+'(攻'+this.matk(m)+')',value:m,score:this.matk(m)+(m.pos==='ATK'?300:0)})),'弱体化させるモンスターを選択',{optional:true});
+        if(t2==null) return false;
+        commit=()=>{ t2.buffs.push({v:-700,until:this.turnNo+1}); this.log('「神便鬼毒酒」発動! '+t2.c.name+'は毒の酒に酔い、攻撃力-700(次の相手ターン終了時まで)!'); };
+        break; }
+      case 'otakiage':
+        commit=()=>{ p.pumpMul=2; this.log('「お焚き上げ」発動! このターン、捧げ物の炎は2倍に燃え上がる!'); };
+        break;
+      case 'heal':
+        commit=()=>{ p.life+=1500; this.log('「人魚の肉」発動! ライフを1500回復(→'+(p.life)+')'); };
+        break;
+      default: return false;
+    }
+    const idx=p.hand.indexOf(c); if(idx<0) return false;
+    p.hand.splice(idx,1); p.grave.push(c);
+    commit();
+    await this.upd();
+    return true;
+  }
+
+  async onSummonFx(pi,m){
+    const p=this.p[pi], o=this.p[1-pi], ag=p.agent;
+    switch(m.c.fx){
+      case 'zashiki':
+        if(p.deck.length>0){ p.hand.push(p.deck.pop()); this.log('座敷童子の効果: 1枚ドロー'); await this.upd(); }
+        break;
+      case 'freeze':{
+        const items=o.mons.filter(x=>x.pos==='ATK').map(x=>({label:x.c.name+'(攻'+this.matk(x)+')',value:x,score:this.matk(x)}));
+        if(!items.length) break;
+        const t=await ag.choose(items,m.c.name+'の効果: 守備表示にするモンスターを選択',{optional:true});
+        if(t){ t.pos='DEF'; this.log(m.c.name+'の効果: '+t.c.name+'を守備表示にした'); await this.upd(); }
+        break; }
+      case 'himiko':{
+        const hidden=o.traps.filter(t=>!t.revealed);
+        if(hidden.length){ const t=pick(hidden); t.revealed=true;
+          this.log('卑弥呼の効果: 伏せカードは「'+t.c.name+'」だと見抜いた!'); await this.upd(); }
+        break; }
+      case 'urashima':{
+        const items=p.grave.map(g=>({label:g.kind==='M'?g.name+'(攻'+g.atk+')':g.name+'('+(g.kind==='S'?'魔法':'罠')+')',value:g,score:cardValue(g)}));
+        if(!items.length) break;
+        const t=await ag.choose(items,'浦島太郎の効果: 手札に戻すカードを選択',{optional:true});
+        if(t){ p.grave.splice(p.grave.indexOf(t),1); p.hand.push(t);
+          this.log('浦島太郎の効果: '+t.name+'を手札に戻した'); await this.upd(); }
+        break; }
+      case 'seimei':{
+        const items=p.deck.filter(x=>x.kind!=='M').map(g=>({label:g.name+'('+(g.kind==='S'?'魔法':'罠')+')',value:g,score:(ST_SCORE[g.fx]||0)}));
+        if(!items.length) break;
+        const t=await ag.choose(items,'安倍晴明の効果: デッキから加えるカードを選択',{optional:true});
+        if(t){ p.deck.splice(p.deck.indexOf(t),1); p.hand.push(t); shuffle(p.deck);
+          this.log('安倍晴明の効果: '+t.name+'を手札に加えた'); await this.upd(); }
+        break; }
+      case 'nobunaga':{
+        const items=o.traps.map(t=>({label:t.revealed?'伏せカード('+t.c.name+')':'伏せカード',value:t,score:100}));
+        if(!items.length) break;
+        const t=await ag.choose(items,'織田信長の効果: 破壊する伏せカードを選択',{optional:true});
+        if(t){ const i=o.traps.indexOf(t); if(i>=0){o.traps.splice(i,1); o.grave.push(t.c);}
+          this.log('織田信長の効果: 伏せられていた「'+t.c.name+'」を撃ち抜いた!'); await this.upd(); }
+        break; }
+      case 'valkyrie':{
+        if(p.mons.length>=5) break;
+        const items=p.grave.filter(x=>x.kind==='M'&&x.star<=3).map(g=>({label:g.name+'(攻'+g.atk+'/守'+g.def+')',value:g,score:g.atk}));
+        if(!items.length) break;
+        const t=await ag.choose(items,'ヴァルキリーの効果: 場に出すモンスターを選択(★3以下)',{optional:true});
+        if(t){ p.grave.splice(p.grave.indexOf(t),1);
+          const pos=t.atk>=t.def?'ATK':'DEF';
+          p.mons.push({c:t,pos,tmp:0,buffs:[],attacked:false,posChanged:true,medusa:false});
+          this.log('ヴァルキリーの効果: '+t.name+'を戦場へ導いた!'); await this.upd(); }
+        break; }
+    }
+  }
+
+  trapOk(di,t,ctx){
+    if(t.setTurn>=this.turnNo) return false;
+    const d=this.p[di];
+    if(ctx.type==='summon') return t.c.fx==='pitfall';
+    if(ctx.type==='attack'){
+      if(t.c.fx==='kanashibari'||t.c.fx==='kamikakushi'||t.c.fx==='aegis'||t.c.fx==='sunakake') return true;
+      if(t.c.fx==='haisui') return d.mons.length===0 && d.hand.some(x=>x.kind==='M');
+    }
+    return false;
+  }
+
+  async trapWindow(di,ctx){
+    const d=this.p[di];
+    const usable=d.traps.filter(t=>this.trapOk(di,t,ctx));
+    if(!usable.length) return null;
+    const t=await d.agent.decideTrap(this,di,usable,ctx);
+    if(!t) return null;
+    const i=d.traps.indexOf(t); if(i<0) return null;
+    d.traps.splice(i,1); d.grave.push(t.c);
+    this.log(d.name+'は罠カード「'+t.c.name+'」を発動!',true);
+    await this.upd();
+    switch(t.c.fx){
+      case 'kanashibari': this.log('攻撃は無効化された!'); return 'negate';
+      case 'sunakake':{
+        ctx.attacker.buffs.push({v:-600,until:this.turnNo});
+        this.log('砂かけ婆の砂が目に! '+ctx.attacker.c.name+'の攻撃力-600(ターン終了時まで)!');
+        await this.upd();
+        return 'sand'; }
+      case 'kamikakushi': return 'bounce';
+      case 'aegis': return 'aegis';
+      case 'pitfall':{
+        const m=ctx.monster;
+        if(this.p[ctx.pi].mons.includes(m)){ this.destroy(this.p[ctx.pi],m);
+          this.log(m.c.name+'は穴の底へ消えた!'); await this.upd(); }
+        return 'pit'; }
+      case 'haisui':{
+        const aatk=this.matk(ctx.attacker);
+        const items=d.hand.filter(x=>x.kind==='M').map(g=>({label:g.name+'(攻'+g.atk+'/守'+g.def+')',value:g,
+          score: g.atk>aatk ? g.atk+1000 : g.def}));
+        const sel=await d.agent.choose(items,'背水の陣: 場に出すモンスターを選択',{});
+        if(!sel) return null;
+        const posSel=await d.agent.choose([
+          {label:'攻撃表示で出す',value:'ATK',score: sel.atk>aatk ? 100 : -50},
+          {label:'守備表示で出す',value:'DEF',score: 10}
+        ],'表示形式を選択',{});
+        const hi=d.hand.indexOf(sel); if(hi>=0) d.hand.splice(hi,1);
+        const nm={c:sel,pos:posSel||'DEF',tmp:0,buffs:[],attacked:true,posChanged:true,medusa:false};
+        d.mons.push(nm);
+        this.log(d.name+'は'+sel.name+'を'+(nm.pos==='ATK'?'攻撃':'守備')+'表示で場に出した! 攻撃の的が変わる!');
+        await this.upd();
+        return {redirect:nm}; }
+    }
+    return null;
+  }
+
+  pumpValue(c,isAtt,defPos){
+    if(isAtt&&c.fx==='pyre') return 1000;
+    if(!isAtt&&c.fx==='wallgift'&&defPos==='DEF') return 800;
+    return c.star*100;
+  }
+
+  async pumpDecision(si,A,target,aB,isAtt){
+    const p=this.p[si];
+    const cards=p.hand.filter(c=>c.kind==='M');
+    if(!cards.length) return null;
+    const defPos=(target.type==='monster'&&target.m)?target.m.pos:null;
+    const items=[];
+    let meaningful=false;
+    for(const c of cards){
+      const v=this.pumpValue(c,isAtt,defPos)*(p.pumpMul||1);
+      let sc=0;
+      if(isAtt){
+        const aatk=this.matk(A);
+        if(target.type==='direct'){
+          const o=this.p[1-si];
+          sc=(aatk<o.life&&aatk+v>=o.life)?99999:0;
+          meaningful=true;
+        } else {
+          const D=target.m;
+          if(D.pos==='ATK'){ const dd=this.matk(D);
+            if(aatk<=dd&&aatk+v>dd) sc=dd-c.atk*0.8;
+            meaningful=true;
+          } else { if(aatk<=D.c.def&&aatk+v>D.c.def){ sc=Math.max(D.c.atk,D.c.def)*0.8-c.atk*0.8; meaningful=true; } }
+        }
+      } else {
+        const aatk=this.matk(A)+(aB||0);
+        const D=target.m;
+        if(D&&D.pos==='ATK'){ const dd=this.matk(D);
+          if(aatk>dd){
+            if(dd+v>aatk){ sc=this.matk(A)-c.atk*0.6+200; meaningful=true; }
+            else if(dd+v===aatk){ sc=(dd>=1500)?100:0; meaningful=true; }
+            else if((aatk-dd)>=p.life&&(aatk-dd-v)<p.life){ sc=500; meaningful=true; }
+          }
+        } else if(D){ const df=D.c.def;
+          if(aatk>df&&df+v>=aatk){ sc=Math.max(D.c.atk,df)*0.7-c.atk*0.6+((df+v>aatk)?150:0); meaningful=true; }
+        }
+      }
+      items.push({label:c.name+'(★'+c.star+')を捨てて、この戦闘の間 +'+v,value:{c,v},score:sc});
+    }
+    if(!p.agent.isAi&&!meaningful) return null;
+    const ctxTxt=(target.type==='direct')
+      ? A.c.name+'(攻'+(this.matk(A)+(aB||0))+')の直接攻撃'
+      : A.c.name+'(攻'+(this.matk(A)+(aB||0))+') vs '+target.m.c.name+'('+(target.m.pos==='ATK'?'攻'+this.matk(target.m):'守'+target.m.c.def)+')';
+    const sel=await p.agent.choose(items,(isAtt?'攻撃側':'防御側')+'の戦闘強化(手札のモンスターを1枚捨てられる)',
+      {optional:true,body:ctxTxt,cancelLabel:'強化しない'});
+    if(!sel) return null;
+    const i=p.hand.indexOf(sel.c); if(i<0) return null;
+    p.hand.splice(i,1); p.grave.push(sel.c);
+    this.stats.disc[si]++;
+    this.log(p.name+'は手札の'+sel.c.name+'(★'+sel.c.star+')を捧げた! この戦闘の間、+'+sel.v+'!');
+    await this.upd();
+    return sel;
+  }
+
+  async attack(pi,m,target){
+    const p=this.p[pi], o=this.p[1-pi];
+    if(!p.mons.includes(m)||m.pos!=='ATK'||m.attacked) return false;
+    if(target.type==='direct'&&o.mons.length>0) return false;
+    if(target.type==='monster'&&!o.mons.includes(target.m)) return false;
+    m.attacked=true;
+    this.log(m.c.name+'(攻'+this.matk(m)+')が'+(target.type==='direct'?'直接攻撃':target.m.c.name+'に攻撃')+'!');
+    await this.upd();
+    let aB=0;
+    const ap=await this.pumpDecision(pi,m,target,0,true);
+    if(ap) aB=ap.v;
+    const res=await this.trapWindow(1-pi,{type:'attack',attacker:m,target,pi,aBonus:aB});
+    if(this.over) return true;
+    if(res==='negate') return true;
+    if(res==='bounce'){
+      const i=p.mons.indexOf(m);
+      if(i>=0){ p.mons.splice(i,1); p.hand.push(m.c); this.log(m.c.name+'は手札へと消えた!'); }
+      await this.upd(); return true;
+    }
+    if(res==='aegis'){
+      for(const x of p.mons.slice()) if(x.pos==='ATK'){ this.destroy(p,x); }
+      this.log('輝く盾が'+p.name+'の攻撃表示モンスターを全て打ち砕いた!');
+      await this.upd(); return true;
+    }
+    if(res&&res.redirect) target={type:'monster',m:res.redirect};
+    if(!p.mons.includes(m)) return true;
+    if(target.type==='monster'&&!o.mons.includes(target.m)) return true;
+    let dB=0;
+    if(res===null&&target.type==='monster'){
+      const dp=await this.pumpDecision(1-pi,m,target,aB,false);
+      if(dp) dB=dp.v;
+    }
+    this.resolveBattle(pi,m,target,aB,dB);
+    await this.upd();
+    return true;
+  }
+
+  resolveBattle(pi,A,target,aB,dB){
+    const p=this.p[pi], o=this.p[1-pi];
+    if(target.type==='direct'){
+      const dmg=this.matk(A)+(aB||0);
+      this.log('直撃! '+o.name+'に'+dmg+'ダメージ!');
+      this.damage(1-pi,dmg); return;
+    }
+    const D=target.m;
+    const a=this.matk(A)+(aB||0);
+    let aDied=false,dDied=false;
+    if(D.pos==='ATK'){
+      const d=this.matk(D)+(dB||0);
+      if(a>d){ this.destroy(o,D); dDied=true; this.log(D.c.name+'を撃破! '+o.name+'に'+(a-d)+'ダメージ'); this.damage(1-pi,a-d); }
+      else if(a<d){ this.destroy(p,A); aDied=true; this.log('返り討ち! '+A.c.name+'は破壊され、'+p.name+'に'+(d-a)+'ダメージ'); this.damage(pi,d-a); }
+      else { this.destroy(o,D); this.destroy(p,A); aDied=dDied=true; this.log('相打ち! 両者破壊'); }
+    } else {
+      const d=D.c.def+(dB||0);
+      if(a>d){ this.destroy(o,D); dDied=true; this.log('守りを破った! '+D.c.name+'を破壊(ダメージなし)'); }
+      else if(a<d){ this.log('守りは固い! '+p.name+'に'+(d-a)+'ダメージ'); this.damage(pi,d-a); }
+      else this.log('守りは揺るがない(ダメージなし)');
+    }
+    if(!this.over){
+      if(A.c.fx==='medusa'&&!dDied&&o.mons.includes(D)){ D.medusa=true; this.log(D.c.name+'は石化し始めた……'); }
+      if(D.c.fx==='medusa'&&!aDied&&p.mons.includes(A)){ A.medusa=true; this.log(A.c.name+'は石化し始めた……'); }
+    }
+  }
+
+  destroy(owner,m){
+    const i=owner.mons.indexOf(m);
+    if(i>=0){ owner.mons.splice(i,1); owner.grave.push(m.c); }
+  }
+  damage(pi,n){
+    const p=this.p[pi]; p.life=Math.max(0,p.life-n);
+    if(p.life<=0&&!this.over) this.gameEnd(1-pi,'ライフ0');
+  }
+  gameEnd(winner,reason){
+    this.over=true; this.winner=winner; this.reason=reason;
+    this.log('【決着】'+this.p[winner].name+'の勝利!('+reason+')',true);
+    if(this.onUpdate) this.onUpdate();
+  }
+}
+
+// ---------- CPUエージェント ----------
+class AiAgent{
+  constructor(){ this.isAi=true; }
+  async choose(items,title,opts){
+    if(!items||!items.length) return null;
+    let best=items[0];
+    for(const it of items) if((it.score||0)>(best.score||0)) best=it;
+    if(opts&&opts.optional&&(best.score||0)<=0) return null;
+    return best.value;
+  }
+  async decideTrap(g,di,usable,ctx){
+    const d=g.p[di];
+    let best=null,bs=0;
+    for(const t of usable){
+      let s=0;
+      if(ctx.type==='summon'&&t.c.fx==='pitfall'){
+        const c=ctx.monster.c;
+        if(c.atk>=1500||c.rar==='SR'||c.rar==='UR') s=c.atk+c.star*50;
+      } else if(ctx.type==='attack'){
+        const A=ctx.attacker, aatk=g.matk(A)+(ctx.aBonus||0);
+        let threat=0, lethal=false;
+        if(ctx.target.type==='direct'){ threat=aatk; lethal=aatk>=d.life; }
+        else { const D=ctx.target.m;
+          if(D.pos==='ATK'){ const dd=g.matk(D);
+            if(aatk>dd){ threat=dd+(aatk-dd); lethal=(aatk-dd)>=d.life; } }
+          else if(aatk>D.c.def) threat=Math.max(D.c.atk,D.c.def)*0.8;
+        }
+        if(t.c.fx==='kanashibari') s = lethal?99999 : (threat>=1000?threat:0);
+        if(t.c.fx==='kamikakushi') s = lethal?99999 : (aatk>=1700?aatk+200 : (threat>=1300?threat:0));
+        if(t.c.fx==='aegis'){
+          const opp=g.p[1-di];
+          const atkers=opp.mons.filter(m=>m.pos==='ATK');
+          const tot=atkers.reduce((x,m)=>x+g.matk(m),0);
+          if(lethal||(atkers.length>=2&&tot>=2800)||aatk>=2500) s=tot+1500;
+        }
+        if(t.c.fx==='sunakake'){
+          const newA=aatk-600;
+          if(ctx.target.type==='monster'){ const D=ctx.target.m;
+            if(D.pos==='ATK'){ const dd=g.matk(D);
+              if(aatk>dd&&newA<dd) s=g.matk(A)+300;
+              else if(aatk>dd&&newA===dd) s=dd*0.5;
+              else if(aatk>dd&&(aatk-dd)>=900) s=350; }
+            else { if(aatk>D.c.def&&newA<=D.c.def) s=Math.max(D.c.atk,D.c.def)*0.7; }
+          } else { s=(aatk>=d.life)?5000:(aatk>=1800?300:0); }
+        }
+        if(t.c.fx==='haisui'){
+          if(lethal) s=99999;
+          else if(aatk>=1500&&d.hand.some(c=>c.kind==='M'&&(c.def>=aatk||c.atk>aatk))) s=aatk;
+        }
+      }
+      if(s>bs){ bs=s; best=t; }
+    }
+    return bs>0?best:null;
+  }
+}
+
+function oppThreat(g,oi){
+  let t=0;
+  for(const m of g.p[oi].mons) if(m.pos==='ATK') t=Math.max(t,g.matk(m));
+  return t;
+}
+function handByFx(p,fx){ return p.hand.find(c=>c.fx===fx); }
+
+async function aiMain(g,pi){
+  const p=g.p[pi], o=g.p[1-pi];
+  if(g.over) return;
+  // 1. 全体除去
+  const tb=handByFx(p,'tenbatsu');
+  if(tb&&o.mons.length){
+    const tot=o.mons.reduce((s,m)=>s+(m.pos==='ATK'?g.matk(m):m.c.def*0.5),0);
+    const mx=Math.max.apply(null,o.mons.map(m=>m.pos==='ATK'?g.matk(m):0).concat([0]));
+    if(tot>=2800||mx>=2300||(o.mons.length>=3&&tot>=2200)) await g.cast(pi,tb);
+  }
+  if(g.over) return;
+  // 2. 単体除去
+  const threat=oppThreat(g,1-pi);
+  const myBest=p.mons.length?Math.max.apply(null,p.mons.map(m=>g.matk(m))):0;
+  if(threat>=1700&&threat>myBest){
+    const oni=handByFx(p,'oni'); const bo=handByFx(p,'bounce');
+    if(oni) await g.cast(pi,oni);
+    else if(bo&&threat>=2000) await g.cast(pi,bo);
+  }
+  if(g.over) return;
+  // 2.5 弱体化(毒酒)
+  const dk=handByFx(p,'dokushu');
+  if(dk&&g.canCast(pi,dk)){
+    const th=oppThreat(g,1-pi);
+    const myB=p.mons.length?Math.max.apply(null,p.mons.map(m=>g.matk(m))):0;
+    if(th>=1400&&th>myB&&th-700<=myB+800) await g.cast(pi,dk);
+  }
+  if(g.over) return;
+  // 3. 蘇生・壁
+  const sh=handByFx(p,'shisha');
+  if(sh&&g.canCast(pi,sh)&&oppThreat(g,1-pi)>=800) await g.cast(pi,sh);
+  const yo=handByFx(p,'yomigaeri');
+  if(yo&&g.canCast(pi,yo)&&p.grave.some(c=>c.kind==='M'&&c.atk>=1900)) await g.cast(pi,yo);
+  if(g.over) return;
+  // 4. 召喚(階段探索つき)
+  await aiSummons(g,pi);
+  if(g.over) return;
+  // 5. 強化魔法
+  const ku=handByFx(p,'kusanagi');
+  if(ku&&g.canCast(pi,ku)) await g.cast(pi,ku); // 効果側スコアで無意味なら自動キャンセル
+  const ot=handByFx(p,'otakiage');
+  if(ot&&g.canCast(pi,ot)){
+    let useful=false;
+    const hands=p.hand.filter(c=>c.kind==='M');
+    for(const m of p.mons){ if(m.pos!=='ATK'||m.attacked) continue;
+      const a=g.matk(m);
+      for(const D of g.p[1-pi].mons){ const dd=(D.pos==='ATK')?g.matk(D):D.c.def;
+        if(a>dd) continue;
+        for(const c of hands){ const v=g.pumpValue(c,true,D.pos);
+          if(a+v<=dd&&a+v*2>dd) useful=true; } } }
+    if(useful) await g.cast(pi,ot);
+  }
+  const gb=handByFx(p,'gunbai');
+  if(gb&&g.canCast(pi,gb)){
+    const myAtkers=p.mons.filter(m=>m.pos==='ATK').length;
+    if(myAtkers>=3||(o.mons.length===0&&myAtkers>=2)) await g.cast(pi,gb);
+  }
+  // 6. 回復
+  const he=handByFx(p,'heal');
+  if(he&&p.life<=3500) await g.cast(pi,he);
+  // 7. 罠セット
+  for(const c of p.hand.slice()){
+    if(c.kind==='T'&&p.traps.length<3) await g.setTrapOp(pi,c);
+  }
+  // 8. 表示形式
+  const th2=oppThreat(g,1-pi);
+  for(const m of p.mons){
+    if(m.posChanged||m.attacked) continue;
+    if(m.pos==='ATK'&&th2>g.matk(m)&&m.c.def>g.matk(m)) g.changePos(pi,m);
+    else if(m.pos==='DEF'&&(o.mons.length===0||g.matk(m)>=th2)&&m.c.atk>=600) g.changePos(pi,m);
+  }
+  await g.upd();
+}
+
+async function aiSummons(g,pi){
+  const p=g.p[pi];
+  if(p.summonUsed||p.mons.length>=5) return;
+  const lvl=p.level;
+  const Ms=p.hand.filter(c=>c.kind==='M');
+  if(!Ms.length) return;
+  let A=null;
+  for(const c of Ms) if(c.star<=lvl && (!A||c.atk>A.atk)) A=c;
+  let B=null;
+  const trySac=(sv,sacAtk,sacRef,fromField)=>{
+    for(const tg of Ms){
+      if(tg===sacRef&&!fromField) continue;
+      if(tg.star!==lvl+sv) continue;
+      const value=tg.atk - sacAtk*0.65;
+      if(!B||value>B.value) B={sac:sacRef,fromField,target:tg,value};
+    }
+  };
+  for(const c of Ms) for(const sv of sacRange(c)) trySac(sv,c.atk,c,false);
+  for(const m of p.mons) for(const sv of sacRange(m.c)) trySac(sv,m.c.atk*0.8,m,true);
+  if(B && (!A || B.target.atk >= A.atk+300)){
+    await g.boostSummon(pi,B.sac,B.fromField,B.target,'ATK');
+  } else if(A){
+    const pos=(A.atk<700&&A.def>A.atk&&oppThreat(g,1-pi)>=900)?'DEF':'ATK';
+    await g.summon(pi,A,pos);
+  } else if(B){
+    await g.boostSummon(pi,B.sac,B.fromField,B.target,'ATK');
+  }
+}
+
+async function aiBattle(g,pi){
+  let guard=14;
+  while(guard-->0&&!g.over){
+    const p=g.p[pi], o=g.p[1-pi];
+    const ready=p.mons.filter(m=>m.pos==='ATK'&&!m.attacked).sort((a,b)=>g.matk(b)-g.matk(a));
+    if(!ready.length) break;
+    let acted=false;
+    for(const m of ready){
+      if(o.mons.length===0){ await g.attack(pi,m,{type:'direct'}); acted=true; break; }
+      let best=null,bs=0;
+      const a=g.matk(m);
+      for(const D of o.mons){
+        if(D.pos==='ATK'){
+          const dd=g.matk(D);
+          if(a>dd){ const s=dd+(a-dd)*0.5+300; if(s>bs){bs=s;best=D;} }
+          else if(a===dd&&dd>=1800){ const s=dd*0.4; if(s>bs){bs=s;best=D;} }
+        } else if(a>D.c.def){
+          const s=Math.max(D.c.atk,D.c.def)*0.7+100; if(s>bs){bs=s;best=D;}
+        }
+      }
+      if(!best){
+        const hands=p.hand.filter(c=>c.kind==='M');
+        for(const D of o.mons){
+          const dd=(D.pos==='ATK')?g.matk(D):D.c.def;
+          if(a>dd) continue;
+          let bc=null;
+          for(const c of hands){ const v=g.pumpValue(c,true,D.pos)*(p.pumpMul||1);
+            if(a+v>dd && (!bc||c.atk<bc.atk)) bc=c; }
+          if(bc){ const gain=(D.pos==='ATK'?dd:Math.max(D.c.atk,D.c.def)*0.8);
+            const s=gain - bc.atk*0.8 - 150;
+            if(s>bs){ bs=s; best=D; } }
+        }
+      }
+      if(best){ await g.attack(pi,m,{type:'monster',m:best}); acted=true; break; }
+    }
+    if(!acted) break;
+  }
+}
+
+// ---------- ヘッドレス・シミュレーション ----------
+async function playHeadless(){
+  const g=new Game(aiBuildDeck(genPool()),aiBuildDeck(genPool()),['先攻','後攻']);
+  g.p[0].agent=new AiAgent(); g.p[1].agent=new AiAgent();
+  g.paceMs=0; g.start();
+  await g.run();
+  return {winner:g.winner, reason:g.reason, turns:g.turnNo,
+          rounds:Math.ceil(g.turnNo/2),
+          ur:g.stats.ur[0]+g.stats.ur[1], boost:g.stats.boost[0]+g.stats.boost[1],
+          lifeW:g.winner>=0?g.p[g.winner].life:0};
+}
+async function simulate(n,progress){
+  const agg={n,w0:0,w1:0,draw:0,turns:0,rounds:0,deckout:0,ur:0,boost:0,lifeW:0};
+  for(let i=0;i<n;i++){
+    const r=await playHeadless();
+    if(r.winner===0)agg.w0++; else if(r.winner===1)agg.w1++; else agg.draw++;
+    agg.turns+=r.turns; agg.rounds+=r.rounds;
+    if(r.reason==='デッキ切れ')agg.deckout++;
+    agg.ur+=r.ur; agg.boost+=r.boost; agg.lifeW+=r.lifeW;
+    if(progress&&i%10===9){ progress(i+1); await sleep(0); }
+  }
+  return agg;
+}
+
+/* =====================================================
+   UI(ブラウザのみ)
+   ===================================================== */
+function initUI(){
+const $app=document.getElementById('app');
+const ui={screen:'title',pool:null,deckSel:new Set(),game:null,meIdx:0,
+          phase:null,battleOk:true,attacker:null,busy:false,
+          phaseResolve:null,battleResolve:null};
+
+function resolvePending(){
+  if(ui.phaseResolve){ const r=ui.phaseResolve; ui.phaseResolve=null; r('end'); }
+  if(ui.battleResolve){ const r=ui.battleResolve; ui.battleResolve=null; r(); }
+  ui.phase=null;
+}
+
+// ---- 人間エージェント ----
+class HumanAgent{
+  constructor(){ this.isAi=false; }
+  mainPhase(battleOk){
+    ui.phase='main'; ui.battleOk=battleOk; ui.attacker=null; render();
+    return new Promise(res=>{ ui.phaseResolve=res; });
+  }
+  battlePhase(){
+    ui.phase='battle'; ui.attacker=null; render();
+    return new Promise(res=>{ ui.battleResolve=res; });
+  }
+  choose(items,title,opts){
+    if(!items||!items.length) return Promise.resolve(null);
+    return modalChoose(title,items,!!(opts&&opts.optional),opts&&opts.body,opts&&opts.cancelLabel);
+  }
+  async decideTrap(g,di,usable,ctx){
+    const desc = ctx.type==='summon'
+      ? '相手が'+ctx.monster.c.name+'(★'+ctx.monster.c.star+' 攻'+ctx.monster.c.atk+')を召喚!'
+      : ctx.attacker.c.name+'(攻'+g.matk(ctx.attacker)+')が'+(ctx.target.type==='direct'?'あなたに直接攻撃':ctx.target.m.c.name+'に攻撃')+'!';
+    const items=usable.map(t=>({label:'「'+t.c.name+'」を発動',sub:t.c.text,value:t}));
+    return modalChoose('罠カードを発動しますか?',items,true,desc,'発動しない');
+  }
+}
+
+// ---- モーダル ----
+function modalChoose(title,items,optional,bodyText,cancelLabel){
+  return new Promise(res=>{
+    const ov=document.createElement('div'); ov.className='overlay';
+    const opts=items.map((it,i)=>'<button data-i="'+i+'">'+esc(it.label)+(it.sub?'<span class="osub">'+esc(it.sub)+'</span>':'')+'</button>').join('');
+    ov.innerHTML='<div class="modal"><h3>'+esc(title)+'</h3>'+(bodyText?'<div class="mbody">'+esc(bodyText)+'</div>':'')+
+      '<div class="opts">'+opts+'</div>'+
+      (optional?'<div class="cancelrow"><button data-i="-1">'+esc(cancelLabel||'キャンセル')+'</button></div>':'')+'</div>';
+    ov.addEventListener('click',e=>{
+      const b=e.target.closest('button'); if(!b)return;
+      const i=+b.dataset.i; ov.remove();
+      res(i<0?null:items[i].value);
+    });
+    document.body.appendChild(ov);
+  });
+}
+function modalInfo(title,body){
+  return modalChoose(title,[{label:'閉じる',value:1}],false,body);
+}
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ---- カード描画 ----
+function cardHTML(c,cls,attrs,extra){
+  const stars=c.kind==='M'?'★'.repeat(Math.min(c.star,8)):'';
+  const kind=c.kind==='M'?('★'+c.star):(c.kind==='S'?'【魔法】':'【罠】');
+  const stat=c.kind==='M'?(c.atk+'/'+c.def):'';
+  return '<div class="card rar-'+c.rar+' '+(cls||'')+'" '+(attrs||'')+'>'+
+    '<span class="rtag">'+c.rar+'</span>'+
+    '<div class="cname">'+esc(c.name)+'</div>'+
+    '<div class="cstars">'+stars+'</div>'+
+    '<div class="ckind">'+kind+'</div>'+
+    (stat?'<div class="cstat">'+stat+'</div>':'')+
+    (extra||'')+'</div>';
+}
+function monHTML(m,g,cls,attrs){
+  const eff=g.matk(m);
+  const bs=(m.buffs||[]).reduce((s,x)=>s+x.v,0);
+  const buff=bs>0?' style="color:#0a7a3c"':(bs<0?' style="color:#b3261e"':'');
+  return '<div class="card rar-'+m.c.rar+' '+(m.pos==='DEF'?'def':'')+' '+(cls||'')+'" '+(attrs||'')+'>'+
+    '<span class="rtag">'+m.c.rar+'</span>'+
+    '<span class="pbadge '+(m.pos==='ATK'?'atk':'')+'">'+(m.pos==='ATK'?'攻':'守')+'</span>'+
+    '<div class="cname">'+esc(m.c.name)+'</div>'+
+    '<div class="cstars">'+'★'.repeat(m.c.star)+'</div>'+
+    '<div class="cstat"><span'+buff+'>'+eff+'</span>/'+m.c.def+'</div>'+
+    (m.medusa?'<div class="ckind" style="color:#7a5a8a">石化中</div>':'')+
+    (m.attacked&&m.pos==='ATK'?'<div class="used"></div>':'')+'</div>';
+}
+function ladderHTML(level){
+  let s='';
+  for(let i=1;i<=8;i++) s+='<span class="'+(i<=level?'on':'')+'">★</span>';
+  if(level>8) s+='<span class="on">+'+(level-8)+'</span>';
+  return '<div class="ladder">'+s+'</div>';
+}
+
+// ---- 画面 ----
+function render(){
+  switch(ui.screen){
+    case 'title': renderTitle(); break;
+    case 'packs': renderPacks(); break;
+    case 'build': renderBuild(); break;
+    case 'duel': renderDuel(); break;
+    case 'result': renderResult(); break;
+    case 'sim': renderSim(); break;
+  }
+}
+
+function renderTitle(){
+  $app.innerHTML='<div class="title-screen">'+
+    '<div class="ttl-eyebrow">パック開封型対戦カードゲーム(仮題)</div>'+
+    '<h1 class="ttl-main">星の階</h1>'+
+    '<div class="ttl-sub">ほしのきざはし ― レベルを登り、星を継ぎ、神を呼べ。</div>'+
+    '<div class="ttl-ladder"><span class="on">★</span><span class="on">★</span><span class="on">★</span><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></div>'+
+    '<button class="primary" onclick="UI.startGame()">CPU対戦をはじめる</button>'+
+    '<button onclick="UI.gotoSim()">バランス検証シミュレーション</button>'+
+    '<button onclick="UI.showRules()">遊び方</button>'+
+    '</div>';
+}
+
+function renderPacks(){
+  const groups=[];
+  for(let i=0;i<4;i++) groups.push(ui.pool.slice(i*10,(i+1)*10));
+  $app.innerHTML='<div class="topbar"><h2>パック開封!</h2>'+
+    '<button class="primary" onclick="UI.gotoBuild()">デッキ構築へ →</button></div>'+
+    groups.map((g,gi)=>
+      '<div class="section-h"><h2>第'+(gi+1)+'パック</h2><div class="sub">N×7 / R×2 / SRかUR×1</div></div>'+
+      '<div class="grid">'+g.map((c,i)=>cardHTML(c,'anim clickable','style="animation-delay:'+((gi*10+i)*40)+'ms" onclick="UI.cardInfo('+c.uid+')"')).join('')+'</div>'
+    ).join('')+
+    '<div class="center"><button class="primary" onclick="UI.gotoBuild()">デッキ構築へ →</button></div>';
+}
+
+function renderBuild(){
+  const n=ui.deckSel.size;
+  const sorted=ui.pool.slice().sort((a,b)=>{
+    const k=x=>x.kind==='M'?0:(x.kind==='S'?1:2);
+    return k(a)-k(b)||a.star-b.star||a.id.localeCompare(b.id);
+  });
+  const row=c=>{
+    const sel=ui.deckSel.has(c.uid);
+    const meta=c.kind==='M'?('★'+c.star+' 攻'+c.atk+'/守'+c.def):(c.kind==='S'?'【魔法】':'【罠】');
+    return '<div class="brow rb-'+c.rar+(sel?' sel':'')+'" onclick="UI.toggleDeck('+c.uid+')">'+
+      '<div class="bhead"><span class="brar">'+c.rar+'</span><span class="bname">'+esc(c.name)+'</span><span class="bmeta">'+meta+'</span></div>'+
+      '<div class="btext">'+esc(c.text||'― 効果なし。数値こそ力。')+'</div></div>';
+  };
+  const groups=[['モンスター',sorted.filter(c=>c.kind==='M')],['魔法',sorted.filter(c=>c.kind==='S')],['罠',sorted.filter(c=>c.kind==='T')]];
+  $app.innerHTML='<div class="topbar">'+
+      '<h2>デッキ構築</h2>'+
+      '<div class="counter">'+n+' / 20</div>'+
+      '<div>'+
+        '<button onclick="UI.autoBuild()">おまかせ構築</button> '+
+        '<button class="primary" '+(n!==20?'disabled':'')+' onclick="UI.startDuel()">対戦開始!</button>'+
+      '</div></div>'+
+    '<div class="note">行をタップで選択/解除。ちょうど20枚で対戦開始。モンスター約13枚+魔法・罠約7枚が目安。</div>'+
+    groups.map(g=>'<div class="section-h"><h2>'+g[0]+'</h2><div class="sub">'+g[1].length+'枚</div></div><div class="blist">'+g[1].map(row).join('')+'</div>').join('');
+}
+
+function renderDuel(){
+  const g=ui.game; if(!g) return;
+  const me=g.p[ui.meIdx], op=g.p[1-ui.meIdx];
+  const myTurn=g.cur===ui.meIdx&&!g.over;
+  const canMain=myTurn&&ui.phase==='main'&&!ui.busy;
+  const canBattle=myTurn&&ui.phase==='battle'&&!ui.busy;
+
+  const opTraps=op.traps.map(t=>t.revealed
+    ? cardHTML(t.c,'','')
+    : '<div class="card facedown"><div class="cname">伏せ</div></div>').join('')||'<span class="empty">伏せなし</span>';
+  const myTraps=me.traps.map(t=>cardHTML(t.c,'','')).join('')||'<span class="empty">伏せなし</span>';
+
+  const opMons=op.mons.map((m,i)=>{
+    const tgt=canBattle&&ui.attacker!=null;
+    return monHTML(m,g,tgt?'tgt':'',tgt?'onclick="UI.attackMon('+i+')"':'onclick="UI.monInfo('+(1-ui.meIdx)+','+i+')"');
+  }).join('')||'<span class="empty">モンスターなし</span>';
+
+  const myMons=me.mons.map((m,i)=>{
+    let cls='',at='';
+    if(canBattle){
+      if(m.pos==='ATK'&&!m.attacked){ cls=(ui.attacker===i?'sel ':'')+'clickable'; at='onclick="UI.pickAttacker('+i+')"'; }
+      else at='onclick="UI.monInfo('+ui.meIdx+','+i+')"';
+    } else if(canMain){ cls='clickable'; at='onclick="UI.fieldMenu('+i+')"'; }
+    else at='onclick="UI.monInfo('+ui.meIdx+','+i+')"';
+    return monHTML(m,g,cls,at);
+  }).join('')||'<span class="empty">モンスターなし</span>';
+
+  const hand=me.hand.map((c,i)=>{
+    const at=canMain?'onclick="UI.handMenu('+i+')"':'onclick="UI.cardInfoH('+i+')"';
+    return cardHTML(c,'clickable',at);
+  }).join('');
+
+  const phaseLabel=g.over?'決着':
+    (!myTurn?'CPUのターン…':(ui.phase==='main'?'あなたのメインフェイズ':'あなたのバトルフェイズ'));
+
+  let bar='';
+  if(g.over){
+    bar='<button class="primary" onclick="UI.showResult()">結果を見る</button>';
+  } else if(canMain){
+    bar=
+      (ui.battleOk?'<button class="primary" onclick="UI.toBattle()">バトルフェイズへ</button>':'')+
+      '<button onclick="UI.endTurn(\'main\')">ターン終了</button>';
+  } else if(canBattle){
+    bar=(ui.attacker!=null&&op.mons.length===0?'<button class="primary" onclick="UI.attackDirect()">直接攻撃!</button>':'')+
+      (ui.attacker!=null?'<button onclick="UI.cancelAttacker()">選択解除</button>':'<span class="pinfo-mini">攻撃するモンスターをタップ</span>')+
+      '<button onclick="UI.endTurn(\'battle\')">ターン終了</button>';
+  } else bar='<span class="pinfo-mini">CPUの行動中…</span>';
+
+  $app.innerHTML=
+    '<div class="pinfo"><span class="pname">CPU</span><span class="life">♥'+op.life+'</span>'+
+      ladderHTML(op.level)+'<span class="meta">手札'+op.hand.length+' / 山札'+op.deck.length+' / 墓地'+op.grave.length+'</span></div>'+
+    '<div class="fieldrow traps">'+opTraps+'</div>'+
+    '<div class="fieldrow">'+opMons+'</div>'+
+    '<div class="logbox" id="logbox">'+g.logs.slice(-60).map(l=>'<div class="'+(l.sys?'sysline':'')+'">'+esc(l.m)+'</div>').join('')+'</div>'+
+    '<div class="fieldrow">'+myMons+'</div>'+
+    '<div class="fieldrow traps">'+myTraps+'</div>'+
+    '<div class="pinfo"><span class="pname">あなた</span><span class="life">♥'+me.life+'</span>'+
+      ladderHTML(me.level)+'<span class="meta">山札'+me.deck.length+' / 墓地'+me.grave.length+' <button style="padding:2px 8px;font-size:11px" onclick="UI.showGrave()">墓地確認</button></span></div>'+
+    '<div class="handrow">'+(hand||'<span class="empty">手札なし</span>')+'</div>'+
+    '<div class="phasebar"><span class="pinfo-mini">'+phaseLabel+'</span>'+bar+'</div>';
+  const lb=document.getElementById('logbox'); if(lb) lb.scrollTop=lb.scrollHeight;
+}
+
+function renderResult(){
+  const g=ui.game;
+  const won=g.winner===ui.meIdx;
+  $app.innerHTML='<div class="title-screen">'+
+    '<h1 class="ttl-main" style="font-size:44px">'+(g.winner<0?'引き分け':(won?'勝利!':'敗北…'))+'</h1>'+
+    '<div class="ttl-sub">'+esc(g.reason)+' / 全'+g.turnNo+'手番('+Math.ceil(g.turnNo/2)+'巡)</div>'+
+    '<div class="note">UR召喚 ― あなた:'+g.stats.ur[ui.meIdx]+'回 / CPU:'+g.stats.ur[1-ui.meIdx]+'回<br>'+
+    'ブースト召喚 ― あなた:'+g.stats.boost[ui.meIdx]+'回 / CPU:'+g.stats.boost[1-ui.meIdx]+'回<br>'+
+    '戦闘強化 ― あなた:'+g.stats.disc[ui.meIdx]+'回 / CPU:'+g.stats.disc[1-ui.meIdx]+'回</div>'+
+    '<button class="primary" onclick="UI.startGame()">新しいパックで再戦</button>'+
+    '<button onclick="UI.gotoTitle()">タイトルへ</button>'+
+  '</div>';
+}
+
+function renderSim(){
+  $app.innerHTML='<div class="topbar"><h2>バランス検証シミュレーション</h2>'+
+    '<button onclick="UI.gotoTitle()">← タイトル</button></div>'+
+    '<div class="note">CPU同士が「パック開封→自動構築→対戦」を繰り返し、ルールブック付録Bの観察項目を計測します。</div>'+
+    '<div class="center" style="margin:18px 0">'+
+      '<button class="gold" onclick="UI.runSim(50)">50試合</button> '+
+      '<button class="gold" onclick="UI.runSim(200)">200試合</button> '+
+      '<button class="gold" onclick="UI.runSim(500)">500試合</button>'+
+    '</div>'+
+    '<div id="simout"></div>';
+}
+
+// ---- 操作 ----
+const UI={
+  gotoTitle(){ ui.screen='title'; ui.game=null; render(); },
+  showRules(){
+    modalInfo('遊び方(要約)',
+'■ 勝利条件: 相手のライフ(8000)を0にする。ドローできない側は敗北。\n'+
+'■ レベル: 自分のターン開始時に+1。先攻はレベル1、後攻はレベル2から。\n'+
+'■ 召喚: 1ターンに1回。通常召喚かブースト召喚のどちらかを行える。\n'+
+'■ 通常召喚: 自分のレベル以下の星のモンスターを召喚する。\n'+
+'■ ブースト召喚: 手札または場のモンスター1体をリリースし、「レベル+その星」とぴったり同じ星のモンスターを手札から召喚する。可変星モンスター(化け狸・鵺)はリリース時の星を選べる。\n'+
+'■ 戦闘強化: 攻撃宣言の後、攻撃側→防御側の順に、手札のモンスター1枚を捨てて「星×100」をその戦闘の間だけ加算できる(各1枚まで)。防御側は罠の発動か強化のどちらか一方のみ。鬼火は攻撃側で+1000、ぬりかべは守備表示の味方に+800。\n'+
+'■ 持続効果: 強化・弱体化はカード記載の期間(ターン終了時まで/次の相手ターン終了時まで/この戦闘の間)だけ続く。\n'+
+'■ バトル: 攻撃表示モンスターは1ターン1回攻撃。守備表示を倒してもダメージなし。直接攻撃は相手の場が空の時のみ。\n'+
+'■ 罠: 伏せた次のターン以降、条件を満たすと発動できる。');
+  },
+  startGame(){
+    ui.pool=genPool(); ui.deckSel=new Set(); ui.screen='packs'; render();
+    window.scrollTo(0,0);
+  },
+  gotoBuild(){ ui.screen='build'; render(); window.scrollTo(0,0); },
+  toggleDeck(uid){
+    if(ui.deckSel.has(uid)) ui.deckSel.delete(uid);
+    else if(ui.deckSel.size<20) ui.deckSel.add(uid);
+    render();
+  },
+  autoBuild(){
+    ui.deckSel=new Set(aiBuildDeck(ui.pool).map(c=>c.uid)); render();
+  },
+  cardInfo(uid){
+    const c=ui.pool.find(x=>x.uid===uid);
+    if(c) modalInfo(c.name+'【'+c.rar+'】', (c.kind==='M'?('★'+c.star+' 攻'+c.atk+'/守'+c.def+'\n'):'')+(c.text||'(効果なし ― 数値こそ力)'));
+  },
+  cardInfoH(i){
+    const c=ui.game.p[ui.meIdx].hand[i];
+    if(c) modalInfo(c.name+'【'+c.rar+'】', (c.kind==='M'?('★'+c.star+' 攻'+c.atk+'/守'+c.def+'\n'):'')+(c.text||'(効果なし)'));
+  },
+  monInfo(pi,i){
+    const m=ui.game.p[pi].mons[i];
+    if(m) modalInfo(m.c.name+'【'+m.c.rar+'】', '★'+m.c.star+' 攻'+ui.game.matk(m)+'/守'+m.c.def+'\n'+(m.c.text||'(効果なし)'));
+  },
+  showGrave(){
+    const g=ui.game;
+    const mine=g.p[ui.meIdx].grave.map(c=>c.name).join('、')||'(なし)';
+    const opp=g.p[1-ui.meIdx].grave.map(c=>c.name).join('、')||'(なし)';
+    modalInfo('墓地', 'あなた: '+mine+'\n\nCPU: '+opp);
+  },
+  async startDuel(){
+    if(ui.deckSel.size!==20) return;
+    const myDeck=ui.pool.filter(c=>ui.deckSel.has(c.uid));
+    const cpuDeck=aiBuildDeck(genPool());
+    const meFirst=Math.random()<0.5;
+    const d0=meFirst?myDeck:cpuDeck, d1=meFirst?cpuDeck:myDeck;
+    const g=new Game(d0,d1,[meFirst?'あなた':'CPU',meFirst?'CPU':'あなた']);
+    ui.meIdx=meFirst?0:1;
+    g.p[ui.meIdx].agent=new HumanAgent();
+    g.p[1-ui.meIdx].agent=new AiAgent();
+    g.paceMs=420;
+    g.onUpdate=()=>{ if(ui.screen==='duel') renderDuel(); };
+    g.start();
+    g.log('あなたは'+(meFirst?'先攻(レベル1スタート)':'後攻(レベル2スタート)')+'!',true);
+    ui.game=g; ui.screen='duel'; ui.phase=null; ui.busy=false; render();
+    window.scrollTo(0,0);
+    await g.run();
+    if(ui.screen==='duel') renderDuel();
+  },
+  showResult(){ ui.screen='result'; render(); window.scrollTo(0,0); },
+
+  // メインフェイズ操作
+  async handMenu(i){
+    if(ui.busy) return;
+    const g=ui.game, me=g.p[ui.meIdx];
+    const c=me.hand[i]; if(!c) return;
+    const items=[];
+    const sacs=[];
+    if(c.kind==='M'){
+      if(!me.summonUsed&&me.mons.length<5&&c.star>me.level){
+        for(const h of me.hand) if(h!==c&&h.kind==='M'&&sacRange(h).indexOf(c.star-me.level)>=0)
+          sacs.push({label:'手札の'+h.name+'(★'+h.star+(String(h.fx||'').startsWith('wild')?'・可変':'')+')をリリース',obj:h,fromField:false});
+        for(const fm of me.mons) if(sacRange(fm.c).indexOf(c.star-me.level)>=0)
+          sacs.push({label:'場の'+fm.c.name+'(★'+fm.c.star+(String(fm.c.fx||'').startsWith('wild')?'・可変':'')+')をリリース',obj:fm,fromField:true});
+      }
+      if(me.summonUsed) items.push({label:'このターンは既に召喚済み',value:null});
+      else if(me.mons.length>=5) items.push({label:'場が満杯(5体まで)',value:null});
+      else {
+        if(c.star<=me.level){
+          items.push({label:'攻撃表示で召喚',value:'satk'});
+          items.push({label:'守備表示で召喚',value:'sdef'});
+        }
+        if(sacs.length) items.push({label:'ブースト召喚(レベル'+me.level+'+★'+(c.star-me.level)+'=★'+c.star+'ぴったり)',value:'boost'});
+        if(!items.length) items.push({label:'召喚不可(レベル不足・ぴったりの生贄なし)',value:null});
+      }
+    } else if(c.kind==='S'){
+      if(g.canCast(ui.meIdx,c)) items.push({label:'発動する',value:'cast'});
+      else items.push({label:'発動条件を満たしていない',value:null});
+    } else {
+      if(me.traps.length<3) items.push({label:'セットする(伏せる)',value:'set'});
+      else items.push({label:'罠は3枚まで',value:null});
+    }
+    const sel=await modalChoose(c.name+'【'+c.rar+'】',items,true,
+      (c.kind==='M'?('★'+c.star+' 攻'+c.atk+'/守'+c.def+'\n'):'')+(c.text||'(効果なし)'));
+    if(!sel) return;
+    if(sel==='boost'){
+      const sacSel=await modalChoose('リリースするモンスターを選択',sacs.map(s=>({label:s.label,value:s})),true);
+      if(!sacSel) return;
+      const posSel=await modalChoose('召喚する表示形式',[{label:'攻撃表示で召喚',value:'ATK'},{label:'守備表示で召喚',value:'DEF'}],true);
+      if(!posSel) return;
+      ui.busy=true;
+      try{ await g.boostSummon(ui.meIdx,sacSel.obj,sacSel.fromField,c,posSel); }
+      finally{ ui.busy=false; }
+      if(g.over) resolvePending();
+      render(); return;
+    }
+    ui.busy=true;
+    try{
+      if(sel==='satk') await g.summon(ui.meIdx,c,'ATK');
+      if(sel==='sdef') await g.summon(ui.meIdx,c,'DEF');
+      if(sel==='cast') await g.cast(ui.meIdx,c);
+      if(sel==='set') await g.setTrapOp(ui.meIdx,c);
+    } finally { ui.busy=false; }
+    if(g.over) resolvePending();
+    render();
+  },
+  async fieldMenu(i){
+    if(ui.busy) return;
+    const g=ui.game, me=g.p[ui.meIdx];
+    const m=me.mons[i]; if(!m) return;
+    const items=[];
+    if(!m.posChanged&&!m.attacked) items.push({label:(m.pos==='ATK'?'守備':'攻撃')+'表示に変更',value:'pos'});
+    if(!items.length) items.push({label:'(このターンは表示形式を変更できない)',value:null});
+    items.push({label:'※リリースはブースト召喚時に選択します',value:null});
+    const sel=await modalChoose(m.c.name+'(攻'+g.matk(m)+'/守'+m.c.def+')',items,true,m.c.text||'');
+    if(!sel) return;
+    ui.busy=true;
+    try{
+      if(sel==='pos') g.changePos(ui.meIdx,m);
+    } finally { ui.busy=false; }
+    render();
+  },
+  toBattle(){
+    if(ui.phaseResolve){ const r=ui.phaseResolve; ui.phaseResolve=null; r('battle'); }
+  },
+  endTurn(ph){
+    if(ph==='main'&&ui.phaseResolve){ const r=ui.phaseResolve; ui.phaseResolve=null; ui.phase=null; r('end'); }
+    if(ph==='battle'&&ui.battleResolve){ const r=ui.battleResolve; ui.battleResolve=null; ui.phase=null; r(); }
+  },
+  pickAttacker(i){
+    ui.attacker=(ui.attacker===i?null:i); render();
+  },
+  cancelAttacker(){ ui.attacker=null; render(); },
+  async attackMon(i){
+    if(ui.busy||ui.attacker==null) return;
+    const g=ui.game, me=g.p[ui.meIdx], op=g.p[1-ui.meIdx];
+    const m=me.mons[ui.attacker], t=op.mons[i];
+    if(!m||!t) return;
+    ui.busy=true; ui.attacker=null;
+    try{ await g.attack(ui.meIdx,m,{type:'monster',m:t}); }
+    finally{ ui.busy=false; }
+    if(g.over) resolvePending();
+    render();
+  },
+  async attackDirect(){
+    if(ui.busy||ui.attacker==null) return;
+    const g=ui.game, me=g.p[ui.meIdx];
+    const m=me.mons[ui.attacker]; if(!m) return;
+    ui.busy=true; ui.attacker=null;
+    try{ await g.attack(ui.meIdx,m,{type:'direct'}); }
+    finally{ ui.busy=false; }
+    if(g.over) resolvePending();
+    render();
+  },
+
+  // シミュレーション
+  gotoSim(){ ui.screen='sim'; render(); },
+  async runSim(n){
+    const out=document.getElementById('simout');
+    out.innerHTML='<div class="note">実行中… 0/'+n+'</div>';
+    const r=await simulate(n,done=>{ out.innerHTML='<div class="note">実行中… '+done+'/'+n+'</div>'; });
+    const pct=x=>(100*x/r.n).toFixed(1)+'%';
+    out.innerHTML='<table class="stats">'+
+      '<tr><th>試合数</th><td>'+r.n+'</td></tr>'+
+      '<tr><th>先攻勝率(レベル1スタート)</th><td>'+pct(r.w0)+'</td></tr>'+
+      '<tr><th>後攻勝率(レベル2スタート)</th><td>'+pct(r.w1)+'</td></tr>'+
+      '<tr><th>平均決着手番数(両者合計)</th><td>'+(r.turns/r.n).toFixed(1)+' 手番(約'+(r.rounds/r.n).toFixed(1)+'巡)</td></tr>'+
+      '<tr><th>デッキ切れ決着率</th><td>'+pct(r.deckout)+'</td></tr>'+
+      '<tr><th>1試合あたりUR召喚数</th><td>'+(r.ur/r.n).toFixed(2)+' 回</td></tr>'+
+      '<tr><th>1試合あたりブースト召喚数</th><td>'+(r.boost/r.n).toFixed(2)+' 回</td></tr>'+
+      '<tr><th>勝者の平均残ライフ</th><td>'+Math.round(r.lifeW/Math.max(1,r.w0+r.w1))+'</td></tr>'+
+    '</table>'+
+    '<div class="note">目安: 先攻・後攻勝率がともに45〜55%、決着が16〜24手番(8〜12巡)、デッキ切れ率15%未満なら設計どおり。偏れば調整つまみ(ライフ/封入率/レベル開始値)を回す。</div>';
+  },
+};
+window.UI=UI;
+render();
+}
+
+// ---------- 起動 ----------
+if(typeof document!=='undefined'){ initUI(); }
+else if(typeof module!=='undefined'){ module.exports={CARDS,genPack,genPool,aiBuildDeck,Game,AiAgent,playHeadless,simulate}; }
+</script>
+</body>
+</html>
