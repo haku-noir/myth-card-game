@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cardById } from '../../data/cards'
 import {
   attackTargets,
@@ -18,6 +18,7 @@ import type { GameAction } from '../../types/actions'
 import type { BattleContext, FieldMonster, GameState, PlayerIdx, TargetOption } from '../../types/game'
 import CardFace from '../card/CardFace'
 import CardBack from '../card/CardBack'
+import GameLog from './GameLog'
 import Modal from '../common/Modal'
 
 type Sel =
@@ -45,7 +46,6 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
   const [sel, setSel] = useState<Sel>({ mode: 'idle' })
   const [detail, setDetail] = useState<Card | null>(null)
   const [graveView, setGraveView] = useState<PlayerIdx | null>(null)
-  const logRef = useRef<HTMLDivElement>(null)
 
   const me = game.players[mySeat]
   const opp = game.players[oppSeat]
@@ -55,10 +55,6 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
   // 自分のターン中の操作判定。エンジンのバリデータは「turnPlayer視点」で
   // 動くため、自分のターンの時だけ使う
   const validatorsActive = myTurn && !pending
-
-  useEffect(() => {
-    logRef.current?.scrollTo({ top: logRef.current.scrollHeight })
-  }, [game.log.length])
 
   useEffect(() => {
     if (pending) setSel({ mode: 'idle' })
@@ -456,12 +452,8 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
         </div>
       )}
 
-      {/* ログ */}
-      <div ref={logRef} className="h-28 overflow-y-auto rounded-lg bg-black/40 p-2 text-xs leading-relaxed text-slate-300">
-        {game.log.map((entry, i) => (
-          <p key={i}>{entry.message}</p>
-        ))}
-      </div>
+      {/* ログ(カード名はホバーでプレビュー、クリックで詳細) */}
+      <GameLog log={game.log} onCardClick={setDetail} />
 
       {/* ==== モーダル類 ==== */}
 

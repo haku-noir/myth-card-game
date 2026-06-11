@@ -1010,10 +1010,17 @@ function resolveBattle(d: D, battle: BattleContext) {
   if (!attacker) return // 罠で除去された場合など
 
   const atk = effectiveAtk(attacker) + battle.attackerBoost
+  const meName = d.players[me].name
+  const oppName = d.players[oppIdx].name
+  // 強化込みの値の内訳表記(例: 攻1300+強化300)
+  const atkLabel = battle.attackerBoost > 0 ? `攻${atk - battle.attackerBoost}+強化${battle.attackerBoost}` : `攻${atk}`
 
   if (battle.target === 'direct') {
     d.players[oppIdx].life -= atk
-    log(d, `直接攻撃! ${d.players[oppIdx].name}に${atk}ダメージ(残り${Math.max(0, d.players[oppIdx].life)})`)
+    log(
+      d,
+      `${meName}の${attacker.card.name}(${atkLabel})が直接攻撃! ${oppName}に${atk}ダメージ(残り${Math.max(0, d.players[oppIdx].life)})`,
+    )
     checkLifeWinner(d)
     return
   }
@@ -1023,9 +1030,15 @@ function resolveBattle(d: D, battle: BattleContext) {
 
   const attackerIsMedusa = attacker.card.id === 'R08'
   const defenderIsMedusa = defender.card.id === 'R08'
+  const defLabel = (base: number, kind: '攻' | '守') =>
+    battle.defenderBoost > 0 ? `${kind}${base - battle.defenderBoost}+強化${battle.defenderBoost}` : `${kind}${base}`
 
   if (defender.position === 'attack') {
     const dAtk = effectiveAtk(defender) + battle.defenderBoost
+    log(
+      d,
+      `戦闘: ${meName}の${attacker.card.name}(${atkLabel}) × ${oppName}の${defender.card.name}(${defLabel(dAtk, '攻')})`,
+    )
     if (atk > dAtk) {
       const diff = atk - dAtk
       destroyMonster(d, oppIdx, battle.target, '戦闘')
@@ -1044,6 +1057,10 @@ function resolveBattle(d: D, battle: BattleContext) {
     }
   } else {
     const dDef = (defender.card.def ?? 0) + battle.defenderBoost
+    log(
+      d,
+      `戦闘: ${meName}の${attacker.card.name}(${atkLabel}) × ${oppName}の${defender.card.name}(${defLabel(dDef, '守')})`,
+    )
     if (atk > dDef) {
       destroyMonster(d, oppIdx, battle.target, '戦闘')
       if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
