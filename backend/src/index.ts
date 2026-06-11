@@ -5,6 +5,7 @@ import { Server } from 'socket.io'
 import cardsRouter from './routes/cards.js'
 import decksRouter from './routes/decks.js'
 import packsRouter from './routes/packs.js'
+import { registerPvpHandlers } from './socket/pvpHandler.js'
 
 const app = express()
 app.use(cors())
@@ -20,9 +21,12 @@ app.use('/api/packs', packsRouter)
 
 const httpServer = createServer(app)
 
-// PvP・ドラフト用のSocket.io(ハンドラは後続フェーズで実装)
 export const io = new Server(httpServer, {
   cors: { origin: '*' },
+})
+
+io.on('connection', (socket) => {
+  registerPvpHandlers(io, socket)
 })
 
 const PORT = Number(process.env.PORT ?? 4000)
