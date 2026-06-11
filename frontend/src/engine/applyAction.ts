@@ -6,12 +6,16 @@ import {
   changePosition,
   declareAttack,
   endTurn,
+  respondBoost,
+  respondReaction,
   respondTarget,
   respondTrap,
   setTrap,
   summon,
   toBattlePhase,
 } from './gameEngine'
+
+const RESPOND_KINDS = ['respondTrap', 'respondTarget', 'respondBoost', 'respondReaction'] as const
 
 /**
  * アクションを実行者の権限チェック付きで適用する。
@@ -21,7 +25,7 @@ import {
 export function applyAction(s: GameState, actor: PlayerIdx, a: GameAction): GameState {
   if (s.winner !== undefined) return s
 
-  if (a.kind === 'respondTrap' || a.kind === 'respondTarget') {
+  if ((RESPOND_KINDS as readonly string[]).includes(a.kind)) {
     // pending応答はforPlayer本人のみ
     if (!s.pending || s.pending.forPlayer !== actor) return s
   } else {
@@ -31,7 +35,7 @@ export function applyAction(s: GameState, actor: PlayerIdx, a: GameAction): Game
 
   switch (a.kind) {
     case 'summon':
-      return summon(s, a.handIdx, a.position, a.releaseZone)
+      return summon(s, a.handIdx, a.position, a.release)
     case 'setTrap':
       return setTrap(s, a.handIdx)
     case 'magic':
@@ -48,5 +52,9 @@ export function applyAction(s: GameState, actor: PlayerIdx, a: GameAction): Game
       return respondTrap(s, a.zone)
     case 'respondTarget':
       return respondTarget(s, a.choice)
+    case 'respondBoost':
+      return respondBoost(s, a.handIdx)
+    case 'respondReaction':
+      return respondReaction(s, a.choice)
   }
 }

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { cardById } from '../../data/cards'
 import {
   attackTargets,
+  boostValue,
   canAttackWith,
   canCastMagic,
   canChangePosition,
@@ -14,7 +15,7 @@ import {
 } from '../../engine/gameEngine'
 import type { Card } from '../../types/card'
 import type { GameAction } from '../../types/actions'
-import type { GameState, PlayerIdx, TargetOption } from '../../types/game'
+import type { FieldMonster, GameState, PlayerIdx, TargetOption } from '../../types/game'
 import CardFace from '../card/CardFace'
 import CardBack from '../card/CardBack'
 import Modal from '../common/Modal'
@@ -79,8 +80,8 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
           )
         } else if (releaseOptionsFor(game, i).length > 0) {
           handMenuItems.push(
-            { label: 'リリース召喚(攻撃表示)', onClick: () => setSel({ mode: 'selectRelease', handIdx: i, position: 'attack' }) },
-            { label: 'リリース召喚(守備表示)', onClick: () => setSel({ mode: 'selectRelease', handIdx: i, position: 'defense' }) },
+            { label: 'ブースト召喚(攻撃表示)', onClick: () => setSel({ mode: 'selectRelease', handIdx: i, position: 'attack' }) },
+            { label: 'ブースト召喚(守備表示)', onClick: () => setSel({ mode: 'selectRelease', handIdx: i, position: 'defense' }) },
           )
         }
       } else if (handCard.type === 'magic' && canCastMagic(game, i)) {
@@ -104,14 +105,18 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
   }
 
   // ---- クリックハンドラ ----
-  const releaseZones =
+  // ぴったりブースト召喚のリリース候補(手札・場の両方)
+  const releaseSpecs =
     sel.mode === 'selectRelease' && validatorsActive ? releaseOptionsFor(game, sel.handIdx) : []
+  const releaseFieldZones = releaseSpecs.filter((r) => r.source === 'field').map((r) => r.index)
+  const releaseHandIdxs = releaseSpecs.filter((r) => r.source === 'hand').map((r) => r.index)
 
   const onMyMonsterClick = (zone: number) => {
     if (pending || game.winner !== undefined) return
     if (sel.mode === 'selectRelease') {
-      if (releaseZones.includes(zone)) {
-        act({ kind: 'summon', handIdx: sel.handIdx, position: sel.position, releaseZone: zone })
+      const spec = releaseSpecs.find((r) => r.source === 'field' && r.index === zone)
+      if (spec) {
+        act({ kind: 'summon', handIdx: sel.handIdx, position: sel.position, release: spec })
         idle()
       }
       return
@@ -224,8 +229,9 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
             }`}
           >
             {m && (
-              <div className={m.position === 'defense' ? 'rotate-90' : ''}>
+              <div className={`relative ${m.position === 'defense' ? 'rotate-90' : ''}`}>
                 <CardFace card={m.card} size="xs" />
+                <BuffBadge m={m} />
               </div>
             )}
           </div>
@@ -299,7 +305,9 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
 
       {/* 選択中ガイド */}
       {sel.mode === 'selectRelease' && (
-        <p className="text-center text-sm text-amber-300">リリースするモンスターを選択してください</p>
+        <p className="text-center text-sm text-amber-300">
+          リリースするモンスターを選択してください(光っている場のモンスター/手札のカード)
+        </p>
       )}
       {sel.mode === 'magicTarget' && !magicModalTargets && (
         <p className="text-center text-sm text-amber-300">対象を選択してください</p>
@@ -331,7 +339,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
             key={z}
             onClick={() => onMyMonsterClick(z)}
             className={`flex h-32 w-24 items-center justify-center rounded-lg ${m ? 'cursor-pointer' : 'border border-dashed border-slate-700'} ${
-              sel.mode === 'selectRelease' && releaseZones.includes(z)
+              sel.mode === 'selectRelease' && releaseFieldZones.includes(z)
                 ? 'ring-2 ring-amber-400'
                 : sel.mode === 'magicTarget' && sel.options.some((o) => o.area === 'ownMonster' && o.index === z)
                   ? 'ring-2 ring-emerald-400'
@@ -343,11 +351,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
             {m && (
               <div className={`relative ${m.position === 'defense' ? 'rotate-90' : ''}`}>
                 <CardFace card={m.card} size="xs" />
-                {m.atkBuff > 0 && (
-                  <span className="absolute -top-1 right-0 rounded bg-emerald-600 px-1 text-[9px] font-bold">
-                    +{m.atkBuff}
-                  </span>
-                )}
+                <BuffBadge m={m} />
                 {m.hasAttacked && (
                   <span className="absolute left-0 top-0 rounded bg-slate-900/80 px-1 text-[9px]">済</span>
                 )}
@@ -387,6 +391,12 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
         <button onClick={() => setGraveView(mySeat)} className="text-slate-400 underline">
           墓地 {me.grave.length}
         </button>
+        {myTurn && game.phase === 'main' && (
+          <span className={me.summonUsedThisTurn ? 'text-slate-500' : 'text-emerald-400'}>
+            召喚権: {me.summonUsedThisTurn ? '使用済み' : 'あり'}
+          </span>
+        )}
+        {me.reinforceDoubledThisTurn && <span className="text-orange-400">お焚き上げ中(強化2倍)</span>}
       </div>
 
       {/* 手札 */}
@@ -394,13 +404,28 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
         {me.hand.map((card, i) => (
           <div
             key={i}
-            className={sel.mode === 'handMenu' && sel.handIdx === i ? 'rounded ring-2 ring-indigo-400' : ''}
+            className={
+              sel.mode === 'handMenu' && sel.handIdx === i
+                ? 'rounded ring-2 ring-indigo-400'
+                : sel.mode === 'selectRelease' && releaseHandIdxs.includes(i)
+                  ? 'rounded ring-2 ring-amber-400'
+                  : ''
+            }
           >
             <CardFace
               card={card}
               size="sm"
               onClick={() => {
                 if (pending || game.winner !== undefined) return
+                // ブースト召喚のリリース選択中: 手札のカードもリリース候補
+                if (sel.mode === 'selectRelease') {
+                  const spec = releaseSpecs.find((r) => r.source === 'hand' && r.index === i)
+                  if (spec) {
+                    act({ kind: 'summon', handIdx: sel.handIdx, position: sel.position, release: spec })
+                    idle()
+                  }
+                  return
+                }
                 setSel(sel.mode === 'handMenu' && sel.handIdx === i ? { mode: 'idle' } : { mode: 'handMenu', handIdx: i })
               }}
             />
@@ -459,10 +484,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
       <Modal open={pending?.kind === 'trapPrompt' && pending.forPlayer === mySeat} onClose={() => {}}>
         {pending?.kind === 'trapPrompt' && pending.forPlayer === mySeat && (
           <div>
-            <p className="mb-3 font-semibold">
-              {opp.name}が{pending.trigger.type === 'summon' ? 'モンスターを召喚しました' : '攻撃を宣言しました'}
-              。罠を発動しますか?
-            </p>
+            <p className="mb-3 font-semibold">{opp.name}がモンスターを召喚しました。罠を発動しますか?</p>
             <div className="mb-4 flex gap-3">
               {pending.zones.map((z) => {
                 const t = me.traps[z]
@@ -533,6 +555,104 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
         </div>
       )}
 
+      {/* 攻撃側の戦闘強化(自分が攻撃側) */}
+      <Modal open={pending?.kind === 'attackerBoost' && pending.forPlayer === mySeat} onClose={() => {}}>
+        {pending?.kind === 'attackerBoost' && pending.forPlayer === mySeat && (
+          <div>
+            <p className="mb-1 font-semibold">戦闘強化(任意)</p>
+            <p className="mb-3 text-sm text-slate-400">
+              手札のモンスター1枚を捨てて、攻撃力を「捨てたモンスターの星×100」上げられます(この戦闘の間)
+            </p>
+            <div className="mb-4 flex max-w-2xl flex-wrap gap-3">
+              {pending.options.map((i) => {
+                const c = me.hand[i]
+                if (!c) return null
+                const v = boostValue(c, 'attacker', undefined, me.reinforceDoubledThisTurn)
+                return (
+                  <div key={i} className="flex flex-col items-center gap-1">
+                    <CardFace card={c} size="sm" onClick={() => act({ kind: 'respondBoost', handIdx: i })} />
+                    <span className="text-sm font-bold text-orange-400">+{v}</span>
+                  </div>
+                )
+              })}
+            </div>
+            <button
+              onClick={() => act({ kind: 'respondBoost', handIdx: null })}
+              className="rounded bg-slate-700 px-5 py-2 text-sm hover:bg-slate-600"
+            >
+              強化しない
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* 防御側リアクション(罠 or 戦闘強化の二者択一) */}
+      <Modal open={pending?.kind === 'defenderReaction' && pending.forPlayer === mySeat} onClose={() => {}}>
+        {pending?.kind === 'defenderReaction' && pending.forPlayer === mySeat && (
+          <div className="max-w-2xl">
+            <p className="mb-1 font-semibold">
+              {opp.name}の攻撃宣言
+              {pending.battle.attackerBoost > 0 && (
+                <span className="text-orange-400">(戦闘強化+{pending.battle.attackerBoost}!)</span>
+              )}
+            </p>
+            <p className="mb-3 text-sm text-slate-400">
+              罠の発動 または 戦闘強化(手札を捨てて星×100加算)の<b>どちらか一方</b>を行えます
+            </p>
+            {pending.trapZones.length > 0 && (
+              <div className="mb-4">
+                <p className="mb-1 text-sm font-semibold text-red-300">罠を発動</p>
+                <div className="flex flex-wrap gap-3">
+                  {pending.trapZones.map((z) => {
+                    const t = me.traps[z]
+                    return t ? (
+                      <div key={z} className="flex flex-col items-center gap-1">
+                        <CardFace
+                          card={t.card}
+                          size="sm"
+                          onClick={() => act({ kind: 'respondReaction', choice: { type: 'trap', zone: z } })}
+                        />
+                        <span className="text-xs text-red-300">発動</span>
+                      </div>
+                    ) : null
+                  })}
+                </div>
+              </div>
+            )}
+            {pending.boostOptions.length > 0 && pending.battle.target !== 'direct' && (
+              <div className="mb-4">
+                <p className="mb-1 text-sm font-semibold text-sky-300">戦闘強化(守る側のモンスターに加算)</p>
+                <div className="flex flex-wrap gap-3">
+                  {pending.boostOptions.map((i) => {
+                    const c = me.hand[i]
+                    if (!c) return null
+                    const defMonster =
+                      pending.battle.target !== 'direct' ? me.monsters[pending.battle.target] : null
+                    const v = boostValue(c, 'defender', defMonster?.position, me.reinforceDoubledThisTurn)
+                    return (
+                      <div key={i} className="flex flex-col items-center gap-1">
+                        <CardFace
+                          card={c}
+                          size="sm"
+                          onClick={() => act({ kind: 'respondReaction', choice: { type: 'boost', handIdx: i } })}
+                        />
+                        <span className="text-sm font-bold text-sky-400">+{v}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            <button
+              onClick={() => act({ kind: 'respondReaction', choice: null })}
+              className="rounded bg-slate-700 px-5 py-2 text-sm hover:bg-slate-600"
+            >
+              何もしない
+            </button>
+          </div>
+        )}
+      </Modal>
+
       {/* 魔法対象(墓地モーダル) */}
       <Modal open={!!magicModalTargets} onClose={idle}>
         {magicModalTargets && sel.mode === 'magicTarget' && (
@@ -589,5 +709,18 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
         </div>
       )}
     </div>
+  )
+}
+
+/** 期限付きバフ/デバフの合計をバッジ表示(+は緑、-は赤) */
+function BuffBadge({ m }: { m: FieldMonster }) {
+  const net = m.buffs.reduce((sum, b) => sum + b.amount, 0)
+  if (net === 0) return null
+  return (
+    <span
+      className={`absolute -top-1 right-0 rounded px-1 text-[9px] font-bold ${net > 0 ? 'bg-emerald-600' : 'bg-red-700'}`}
+    >
+      {net > 0 ? `+${net}` : net}
+    </span>
   )
 }

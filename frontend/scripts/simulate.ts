@@ -10,6 +10,8 @@ import {
   createGame,
   declareAttack,
   endTurn,
+  respondBoost,
+  respondReaction,
   respondTarget,
   respondTrap,
   setTrap,
@@ -17,7 +19,14 @@ import {
   toBattlePhase,
   canEnterBattle,
 } from '../src/engine/gameEngine'
-import { decideTarget, decideTrap, nextAttack, nextMainAction } from '../src/engine/cpu'
+import {
+  decideBoost,
+  decideReaction,
+  decideTarget,
+  decideTrap,
+  nextAttack,
+  nextMainAction,
+} from '../src/engine/cpu'
 import type { Card } from '../src/types/card'
 import type { Difficulty, GameState, PlayerIdx } from '../src/types/game'
 
@@ -74,6 +83,10 @@ function runGame(diffs: [Difficulty, Difficulty], verbose = false): GameState {
       const diff = diffs[actor]
       if (s.pending.kind === 'trapPrompt') {
         s = respondTrap(s, decideTrap(s, actor, diff))
+      } else if (s.pending.kind === 'attackerBoost') {
+        s = respondBoost(s, decideBoost(s, actor, diff))
+      } else if (s.pending.kind === 'defenderReaction') {
+        s = respondReaction(s, decideReaction(s, actor, diff))
       } else {
         const choice = decideTarget(s, actor)
         // optional効果はCPUが選べなければスキップ、必須は先頭を強制
@@ -90,7 +103,7 @@ function runGame(diffs: [Difficulty, Difficulty], verbose = false): GameState {
       const before = s
       switch (action.type) {
         case 'summon':
-          s = summon(s, action.handIdx, action.position, action.releaseZone)
+          s = summon(s, action.handIdx, action.position, action.release)
           break
         case 'magic':
           s = castMagic(s, action.handIdx, action.target)

@@ -8,6 +8,8 @@ import {
   createGame,
   declareAttack,
   endTurn,
+  respondBoost,
+  respondReaction,
   respondTarget,
   respondTrap,
   setTrap,
@@ -15,7 +17,14 @@ import {
   toBattlePhase,
 } from '../engine/gameEngine'
 import { applyAction } from '../engine/applyAction'
-import { decideTarget, decideTrap, nextAttack, nextMainAction } from '../engine/cpu'
+import {
+  decideBoost,
+  decideReaction,
+  decideTarget,
+  decideTrap,
+  nextAttack,
+  nextMainAction,
+} from '../engine/cpu'
 
 export const HUMAN = 0 as const
 export const CPU = 1 as const
@@ -52,6 +61,10 @@ export const useGameStore = create<GameStore>((set, get) => {
           if (!cur || !cur.pending) continue
           if (cur.pending.kind === 'trapPrompt') {
             set({ game: respondTrap(cur, decideTrap(cur, CPU, get().difficulty)) })
+          } else if (cur.pending.kind === 'attackerBoost') {
+            set({ game: respondBoost(cur, decideBoost(cur, CPU, get().difficulty)) })
+          } else if (cur.pending.kind === 'defenderReaction') {
+            set({ game: respondReaction(cur, decideReaction(cur, CPU, get().difficulty)) })
           } else {
             const choice = decideTarget(cur, CPU)
             set({ game: respondTarget(cur, choice ?? (cur.pending.optional ? null : cur.pending.options[0])) })
@@ -69,7 +82,7 @@ export const useGameStore = create<GameStore>((set, get) => {
           const action = nextMainAction(cur, CPU, get().difficulty)
           switch (action.type) {
             case 'summon':
-              set({ game: summon(cur, action.handIdx, action.position, action.releaseZone) })
+              set({ game: summon(cur, action.handIdx, action.position, action.release) })
               break
             case 'magic':
               set({ game: castMagic(cur, action.handIdx, action.target) })

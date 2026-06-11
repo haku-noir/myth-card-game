@@ -5,10 +5,12 @@ import {
   INITIAL_LIFE,
   MONSTER_ZONES,
   TRAP_ZONES,
+  type BattleContext,
   type FieldMonster,
   type GameState,
   type PlayerIdx,
   type PlayerState,
+  type ReleaseSpec,
   type TargetOption,
   type TrapTrigger,
 } from '../types/game'
@@ -46,6 +48,8 @@ function makePlayer(name: string, deck: Card[], isFirst: boolean): PlayerState {
     grave: [],
     monsters: Array(MONSTER_ZONES).fill(null),
     traps: Array(TRAP_ZONES).fill(null),
+    summonUsedThisTurn: false,
+    reinforceDoubledThisTurn: false,
   }
 }
 
@@ -77,6 +81,8 @@ function startTurn(s: GameState): GameState {
     d.turnCount++
     const p = d.players[d.turnPlayer]
     p.level++
+    p.summonUsedThisTurn = false
+    p.reinforceDoubledThisTurn = false
     for (const m of p.monsters) {
       if (m) {
         m.hasAttacked = false
@@ -99,7 +105,7 @@ function startTurn(s: GameState): GameState {
 
 export function endTurn(s: GameState): GameState {
   const cleaned = produce(s, (d) => {
-    // ターン終了時処理: メデューサ印の破壊と「ターン終了時まで」バフの解除
+    // ターン終了時処理: メデューサ印の破壊と期限切れバフの解除
     for (const pi of [0, 1] as const) {
       const p = d.players[pi]
       for (let z = 0; z < MONSTER_ZONES; z++) {
@@ -110,7 +116,7 @@ export function endTurn(s: GameState): GameState {
           p.grave.push(m.card)
           p.monsters[z] = null
         } else {
-          m.atkBuff = 0
+          m.buffs = m.buffs.filter((b) => b.expiresAfterTurn > d.turnCount)
         }
       }
     }
@@ -134,7 +140,9 @@ export const canEnterBattle = (s: GameState): boolean =>
 // 共通ヘルパー
 // ============================================================
 
-const effectiveAtk = (m: FieldMonster) => (m.card.atk ?? 0) + m.atkBuff
+/** 実効攻撃力(期限付きバフ込み・0未満は0) */
+export const effectiveAtk = (m: FieldMonster): number =>
+  Math.max(0, (m.card.atk ?? 0) + m.buffs.reduce((sum, b) => sum + b.amount, 0))
 
 function destroyMonster(d: D, owner: PlayerIdx, zone: number, cause: string) {
   const m = d.players[owner].monsters[zone]
@@ -161,7 +169,7 @@ function firstEmptyZone(p: PlayerState | Draft<PlayerState>): number {
   return p.monsters.findIndex((m) => m === null)
 }
 
-/** レベル無視でモンスターを場に置く(「場に出す」。召喚時効果は発動しない) */
+/** レベル無視でモンスターを場に置く(「場に出す」。召喚時効果なし・召喚権も消費しない) */
 function placeMonster(
   d: D,
   owner: PlayerIdx,
@@ -176,26 +184,24 @@ function placeMonster(
     hasAttacked: false,
     changedPositionThisTurn: false,
     summonedThisTurn: true,
-    atkBuff: 0,
+    buffs: [],
     destroyAtEndOfTurn: false,
   }
   return zone
 }
 
 // ============================================================
-// 召喚
+// 召喚(v1.2: 1ターン1回、ぴったりブースト)
 // ============================================================
 
-/** 通常召喚できる星の上限(リリースなし) */
-export const summonLimit = (s: GameState, p: PlayerIdx): number => s.players[p].level
-
-/** 手札のモンスターが通常召喚可能か */
+/** 手札のモンスターが通常召喚可能か(リリースなし) */
 export function canSummon(s: GameState, handIdx: number): boolean {
   const p = s.players[s.turnPlayer]
   const card = p.hand[handIdx]
   return (
     s.phase === 'main' &&
     !s.pending &&
+    !p.summonUsedThisTurn &&
     !!card &&
     card.type === 'monster' &&
     (card.stars ?? 99) <= p.level &&
@@ -203,61 +209,120 @@ export function canSummon(s: GameState, handIdx: number): boolean {
   )
 }
 
-/** リリースすれば召喚可能になる自分フィールドのゾーン一覧 */
-export function releaseOptionsFor(s: GameState, handIdx: number): number[] {
+/**
+ * ブースト召喚のリリース候補(ぴったり一致のみ)。
+ * 必要星 = 召喚したい星 - レベル。手札と場の両方から探す。
+ * 可変星モンスターは範囲内なら starsAs=必要星 で候補になる。
+ */
+export function releaseOptionsFor(s: GameState, handIdx: number): ReleaseSpec[] {
   const p = s.players[s.turnPlayer]
   const card = p.hand[handIdx]
-  if (s.phase !== 'main' || s.pending || !card || card.type !== 'monster') return []
-  const stars = card.stars ?? 99
-  if (stars <= p.level) return [] // リリース不要
-  const zones: number[] = []
-  for (let z = 0; z < MONSTER_ZONES; z++) {
-    const m = p.monsters[z]
-    if (m && stars <= p.level + (m.card.stars ?? 0)) zones.push(z)
+  if (s.phase !== 'main' || s.pending || p.summonUsedThisTurn) return []
+  if (!card || card.type !== 'monster') return []
+  const needed = (card.stars ?? 99) - p.level
+  if (needed < 1) return [] // レベル以下は通常召喚で出せる
+
+  const matches = (c: Card): ReleaseSpec['starsAs'] | false => {
+    if (c.releaseStarRange) {
+      return c.releaseStarRange.min <= needed && needed <= c.releaseStarRange.max
+        ? needed
+        : false
+    }
+    return c.stars === needed ? undefined : false
   }
-  return zones
+
+  const out: ReleaseSpec[] = []
+  // 場のモンスター(リリースで1枠空くので場が満杯でも可)
+  p.monsters.forEach((m, z) => {
+    if (!m) return
+    const starsAs = matches(m.card)
+    if (starsAs !== false) out.push({ source: 'field', index: z, starsAs })
+  })
+  // 手札のモンスター(召喚するカード自身は除く)。場に空きが必要
+  if (firstEmptyZone(p) >= 0) {
+    p.hand.forEach((c, i) => {
+      if (i === handIdx || c.type !== 'monster') return
+      const starsAs = matches(c)
+      if (starsAs !== false) out.push({ source: 'hand', index: i, starsAs })
+    })
+  }
+  return out
 }
 
 /**
- * 召喚(releaseZone指定でブースト召喚)。
+ * 召喚(release指定でぴったりブースト召喚)。1ターン1回。
  * 相手に落とし穴があれば罠確認のpendingを立てる。
  */
 export function summon(
   s: GameState,
   handIdx: number,
   position: 'attack' | 'defense',
-  releaseZone?: number,
+  release?: ReleaseSpec,
 ): GameState {
   return produce(s, (d) => {
     const me = d.turnPlayer
     const p = d.players[me]
     const card = p.hand[handIdx]
     if (!card || card.type !== 'monster' || d.phase !== 'main' || d.pending) return
+    if (p.summonUsedThisTurn) return
+    const stars = card.stars ?? 99
 
-    let limit = p.level
-    if (releaseZone !== undefined) {
-      const rel = p.monsters[releaseZone]
-      if (!rel) return
-      limit += rel.card.stars ?? 0
-      log(d, `${p.name}は${rel.card.name}をリリース`)
-      p.grave.push(rel.card)
-      p.monsters[releaseZone] = null
+    if (release === undefined) {
+      // 通常召喚
+      if (stars > p.level || firstEmptyZone(p) < 0) return
+      p.hand.splice(handIdx, 1)
+    } else {
+      // ぴったりブースト召喚
+      const releasedCard =
+        release.source === 'field' ? p.monsters[release.index]?.card : p.hand[release.index]
+      if (!releasedCard || releasedCard.type !== 'monster') return
+      if (release.source === 'hand' && release.index === handIdx) return
+
+      let releasedStars: number
+      if (release.starsAs !== undefined) {
+        const range = releasedCard.releaseStarRange
+        if (!range || release.starsAs < range.min || release.starsAs > range.max) return
+        releasedStars = release.starsAs
+      } else {
+        if (releasedCard.releaseStarRange) return // 可変星はstarsAs必須
+        releasedStars = releasedCard.stars ?? 0
+      }
+      if (stars !== p.level + releasedStars) return // ぴったり一致のみ
+
+      // リリース実行(リリースは破壊ではない)
+      if (release.source === 'field') {
+        log(d, `${p.name}は場の${releasedCard.name}をリリース(星${releasedStars}として)`)
+        p.grave.push(releasedCard)
+        p.monsters[release.index] = null
+        p.hand.splice(handIdx, 1)
+      } else {
+        if (firstEmptyZone(p) < 0) return
+        log(d, `${p.name}は手札の${releasedCard.name}をリリース(星${releasedStars}として)`)
+        // 手札から召喚カードとリリースカードの2枚を取り除く(大きいインデックスから)
+        const [hi, lo] =
+          release.index > handIdx ? [release.index, handIdx] : [handIdx, release.index]
+        p.hand.splice(hi, 1)
+        p.hand.splice(lo, 1)
+        p.grave.push(releasedCard)
+      }
     }
-    if ((card.stars ?? 99) > limit) return
+
     const zone = firstEmptyZone(p)
     if (zone < 0) return
-
-    p.hand.splice(handIdx, 1)
     p.monsters[zone] = {
       card,
       position,
       hasAttacked: false,
       changedPositionThisTurn: false,
       summonedThisTurn: true,
-      atkBuff: 0,
+      buffs: [],
       destroyAtEndOfTurn: false,
     }
-    log(d, `${p.name}は${card.name}を${position === 'attack' ? '攻撃' : '守備'}表示で召喚`)
+    p.summonUsedThisTurn = true
+    log(
+      d,
+      `${p.name}は${card.name}を${position === 'attack' ? '攻撃' : '守備'}表示で${release ? 'ブースト召喚' : '召喚'}`,
+    )
 
     // 相手の罠チェック(召喚トリガー: 落とし穴)
     const opp = other(me)
@@ -373,10 +438,10 @@ function usableTrapZones(d: D, owner: PlayerIdx, trigger: TrapTrigger): number[]
     if (!t || t.setOnTurn === d.turnCount) continue // セットしたターンは発動不可
     const id = t.card.id
     if (trigger.type === 'summon') {
-      if (id === 'R11') zones.push(z) // 落とし穴
+      if (id === 'SR10') zones.push(z) // 落とし穴
     } else {
-      if (id === 'N24' || id === 'N25') zones.push(z) // 金縛り・神隠し
-      if (id === 'SR8') zones.push(z) // アイギスの盾
+      if (id === 'N24' || id === 'R14' || id === 'N28') zones.push(z) // 金縛り・神隠し・砂かけ婆
+      if (id === 'UR5') zones.push(z) // アイギスの盾
       if (id === 'R12') {
         // 背水の陣: 自分の場が空・手札にモンスター・(直接攻撃時のみ成立)
         const fieldEmpty = p.monsters.every((m) => m === null)
@@ -412,16 +477,17 @@ export function setTrap(s: GameState, handIdx: number): GameState {
   })
 }
 
-/** 罠発動の応答。zone=null は発動しない */
+/** 罠発動の応答(召喚トリガーの落とし穴のみ)。zone=null は発動しない */
 export function respondTrap(s: GameState, zone: number | null): GameState {
   return produce(s, (d) => {
     const pend = d.pending
     if (!pend || pend.kind !== 'trapPrompt') return
     d.pending = undefined
     const trigger = pend.trigger
+    if (trigger.type !== 'summon') return
 
     if (zone === null) {
-      continueAfterTrapWindow(d, trigger)
+      queueSummonEffect(d, trigger.zone)
       return
     }
 
@@ -429,79 +495,18 @@ export function respondTrap(s: GameState, zone: number | null): GameState {
     const p = d.players[owner]
     const slot = p.traps[zone]
     if (!slot) {
-      continueAfterTrapWindow(d, trigger)
+      queueSummonEffect(d, trigger.zone)
       return
     }
     p.traps[zone] = null
     p.grave.push(slot.card)
     log(d, `${p.name}は罠「${slot.card.name}」を発動!`)
 
-    const attacker = other(owner) // トリガーを起こした側
-    switch (slot.card.id) {
-      case 'R11': {
-        // 落とし穴: 召喚されたモンスターを破壊(召喚時効果は発動しない)
-        if (trigger.type === 'summon') destroyMonster(d, attacker, trigger.zone, '落とし穴')
-        return
-      }
-      case 'N24': {
-        // 金縛り: 攻撃無効(攻撃権は消費)
-        if (trigger.type === 'attack') {
-          const m = d.players[attacker].monsters[trigger.attackerZone]
-          if (m) m.hasAttacked = true
-          log(d, '攻撃は無効化された')
-        }
-        return
-      }
-      case 'N25': {
-        // 神隠し: 攻撃モンスターを手札に戻す
-        if (trigger.type === 'attack') {
-          const m = d.players[attacker].monsters[trigger.attackerZone]
-          if (m) {
-            d.players[attacker].hand.push(m.card)
-            d.players[attacker].monsters[trigger.attackerZone] = null
-            log(d, `${m.card.name}は手札に戻された`)
-          }
-        }
-        return
-      }
-      case 'SR8': {
-        // アイギスの盾: 攻撃側の攻撃表示モンスターを全破壊
-        if (trigger.type === 'attack') {
-          for (let z = 0; z < MONSTER_ZONES; z++) {
-            const m = d.players[attacker].monsters[z]
-            if (m && m.position === 'attack') destroyMonster(d, attacker, z, 'アイギスの盾')
-          }
-        }
-        return
-      }
-      case 'R12': {
-        // 背水の陣: 手札からモンスターを選んで場に出す(必須選択)
-        if (trigger.type === 'attack') {
-          const options = p.hand
-            .map((c, i) => ({ card: c, i }))
-            .filter(({ card }) => card.type === 'monster')
-            .map(({ i }) => ({ area: 'hand' as const, index: i }))
-          d.pending = {
-            kind: 'effectTarget',
-            forPlayer: owner,
-            sourceId: 'R12',
-            optional: false,
-            options,
-            ctx: { attackerZone: trigger.attackerZone },
-          }
-        }
-        return
-      }
+    if (slot.card.id === 'SR10') {
+      // 落とし穴: 召喚されたモンスターを破壊(召喚時効果は発動しない)
+      destroyMonster(d, other(owner), trigger.zone, '落とし穴')
     }
   })
-}
-
-function continueAfterTrapWindow(d: D, trigger: TrapTrigger) {
-  if (trigger.type === 'summon') {
-    queueSummonEffect(d, trigger.zone)
-  } else {
-    resolveBattle(d, trigger.attackerZone, trigger.target)
-  }
 }
 
 // ============================================================
@@ -589,7 +594,12 @@ export function respondTarget(s: GameState, choice: TargetOption | null): GameSt
           p.hand.splice(choice.index, 1)
           const zone = placeMonster(d, me, card, 'defense')
           log(d, `${card.name}を守備表示で場に出した。攻撃はこのモンスターへ向かう`)
-          resolveBattle(d, attackerZone, zone)
+          resolveBattle(d, {
+            attackerZone,
+            target: zone,
+            attackerBoost: pend.ctx?.attackerBoost ?? 0,
+            defenderBoost: 0,
+          })
         }
         return
       }
@@ -609,8 +619,9 @@ export function magicTargets(s: GameState, handIdx: number): TargetOption[] | nu
   if (!card || card.type !== 'magic') return []
 
   switch (card.id) {
-    case 'N19': // 鬼退治
+    case 'SR9': // 鬼退治
     case 'R09': // 強制送還
+    case 'N27': // 神便鬼毒酒
       return optionList(opp.monsters, () => true, 'oppMonster')
     case 'N20': // 草薙剣
       return optionList(p.monsters, () => true, 'ownMonster')
@@ -626,13 +637,15 @@ export function magicTargets(s: GameState, handIdx: number): TargetOption[] | nu
     }
     case 'N23': // 軍配: 対象不要(自分の場に1体以上)
       return p.monsters.some((m) => m !== null) ? null : []
+    case 'N29': // お焚き上げ: 対象不要
+      return null
     case 'R10': // 人魚の肉: 対象不要
       return null
-    case 'SR6': // 天罰: 対象不要(相手の場に1体以上)
+    case 'UR4': // 天罰: 対象不要(相手の場に1体以上)
       return opp.monsters.some((m) => m !== null) ? null : []
     case 'SR7': {
       // 黄泉返り
-      if (s.players[s.turnPlayer].monsters.every((m) => m !== null)) return []
+      if (p.monsters.every((m) => m !== null)) return []
       return p.grave
         .map((c, i) => ({ card: c, i }))
         .filter(({ card: c }) => c.type === 'monster')
@@ -662,14 +675,15 @@ export function castMagic(s: GameState, handIdx: number, target?: TargetOption):
     log(d, `${p.name}は魔法「${card.name}」を発動`)
 
     switch (card.id) {
-      case 'N19':
+      case 'SR9':
         if (target) destroyMonster(d, other(me), target.index, '鬼退治')
         break
       case 'N20': {
+        // 草薙剣: 次の相手ターンの終了時まで+500
         const m = target ? p.monsters[target.index] : null
         if (m) {
-          m.atkBuff += 500
-          log(d, `${m.card.name}の攻撃力+500(ターン終了時まで)`)
+          m.buffs.push({ amount: 500, expiresAfterTurn: d.turnCount + 1 })
+          log(d, `${m.card.name}の攻撃力+500(次の相手ターン終了時まで)`)
         }
         break
       }
@@ -692,8 +706,25 @@ export function castMagic(s: GameState, handIdx: number, target?: TargetOption):
         break
       }
       case 'N23':
-        for (const m of p.monsters) if (m) m.atkBuff += 300
+        // 軍配: ターン終了時まで+300
+        for (const m of p.monsters) {
+          if (m) m.buffs.push({ amount: 300, expiresAfterTurn: d.turnCount })
+        }
         log(d, '自分の全モンスターの攻撃力+300(ターン終了時まで)')
+        break
+      case 'N27': {
+        // 神便鬼毒酒: 次の相手ターンの終了時まで-700
+        const m = target ? opp.monsters[target.index] : null
+        if (m) {
+          m.buffs.push({ amount: -700, expiresAfterTurn: d.turnCount + 1 })
+          log(d, `${m.card.name}の攻撃力-700(次の相手ターン終了時まで)`)
+        }
+        break
+      }
+      case 'N29':
+        // お焚き上げ: このターンの自分の戦闘強化が2倍
+        p.reinforceDoubledThisTurn = true
+        log(d, 'このターン、自分の戦闘強化の値が2倍になる')
         break
       case 'R09': {
         const m = target ? opp.monsters[target.index] : null
@@ -708,7 +739,7 @@ export function castMagic(s: GameState, handIdx: number, target?: TargetOption):
         p.life += 1500
         log(d, `ライフを1500回復(→${p.life})`)
         break
-      case 'SR6':
+      case 'UR4':
         for (let z = 0; z < MONSTER_ZONES; z++) {
           if (opp.monsters[z]) destroyMonster(d, other(me), z, '天罰')
         }
@@ -753,7 +784,7 @@ export function changePosition(s: GameState, zone: number): GameState {
 }
 
 // ============================================================
-// バトル
+// バトル(v1.3: 戦闘強化 → 防御側リアクション → ダメージ計算)
 // ============================================================
 
 export function canAttackWith(s: GameState, zone: number): boolean {
@@ -771,6 +802,19 @@ export function attackTargets(s: GameState): (number | 'direct')[] {
   return zones.length > 0 ? zones : ['direct']
 }
 
+/** 戦闘強化で捨てた時の加算値(鬼火・ぬりかべ・お焚き上げの特例込み) */
+export function boostValue(
+  card: Card,
+  role: 'attacker' | 'defender',
+  defenderPosition: 'attack' | 'defense' | undefined,
+  doubled: boolean,
+): number {
+  let base = (card.stars ?? 0) * 100
+  if (role === 'attacker' && card.id === 'N03') base = 1000 // 鬼火
+  if (role === 'defender' && card.id === 'N10' && defenderPosition === 'defense') base = 800 // ぬりかべ
+  return doubled ? base * 2 : base
+}
+
 export function declareAttack(s: GameState, attackerZone: number, target: number | 'direct'): GameState {
   return produce(s, (d) => {
     if (!canAttackWith(s, attackerZone)) return
@@ -782,68 +826,226 @@ export function declareAttack(s: GameState, attackerZone: number, target: number
     if (target === 'direct' && oppHasMonster) return
     if (target !== 'direct' && !d.players[opp].monsters[target]) return
 
-    attacker.hasAttacked = true // 金縛りで無効化されても攻撃権は消費
+    attacker.hasAttacked = true // 無効化されても攻撃権は消費
     const targetName =
       target === 'direct' ? '直接攻撃' : `${d.players[opp].monsters[target]!.card.name}に攻撃`
     log(d, `${attacker.card.name}が${targetName}を宣言`)
 
-    const trapZones = usableTrapZones(d, opp, { type: 'attack', attackerZone, target })
-    if (trapZones.length > 0) {
-      d.pending = {
-        kind: 'trapPrompt',
-        forPlayer: opp,
-        zones: trapZones,
-        trigger: { type: 'attack', attackerZone, target },
-      }
+    const battle: BattleContext = { attackerZone, target, attackerBoost: 0, defenderBoost: 0 }
+
+    // ①攻撃側の戦闘強化(任意): 手札にモンスターがあれば選択
+    const boostOptions = d.players[me].hand
+      .map((c, i) => ({ c, i }))
+      .filter(({ c }) => c.type === 'monster')
+      .map(({ i }) => i)
+    if (boostOptions.length > 0) {
+      d.pending = { kind: 'attackerBoost', forPlayer: me, options: boostOptions, battle }
     } else {
-      resolveBattle(d, attackerZone, target)
+      proceedToDefenderReaction(d, battle)
     }
   })
 }
 
-function resolveBattle(d: D, attackerZone: number, target: number | 'direct') {
+/** 攻撃側の戦闘強化の応答。handIdx=null はスキップ */
+export function respondBoost(s: GameState, handIdx: number | null): GameState {
+  return produce(s, (d) => {
+    const pend = d.pending
+    if (!pend || pend.kind !== 'attackerBoost') return
+    d.pending = undefined
+    const battle = { ...pend.battle }
+    const me = pend.forPlayer
+    const p = d.players[me]
+
+    if (handIdx !== null && pend.options.includes(handIdx)) {
+      const card = p.hand[handIdx]
+      if (card && card.type === 'monster') {
+        p.hand.splice(handIdx, 1)
+        p.grave.push(card)
+        const value = boostValue(card, 'attacker', undefined, p.reinforceDoubledThisTurn)
+        battle.attackerBoost = value
+        log(d, `${p.name}は${card.name}を捨てて戦闘強化! 攻撃力+${value}(この戦闘の間)`)
+      }
+    }
+    proceedToDefenderReaction(d, battle)
+  })
+}
+
+/** ②防御側のリアクション(罠1枚 or 戦闘強化のどちらか一方) */
+function proceedToDefenderReaction(d: D, battle: BattleContext) {
+  const me = d.turnPlayer
+  const defender = other(me)
+  const trigger: TrapTrigger = { type: 'attack', attackerZone: battle.attackerZone, target: battle.target }
+  const trapZones = usableTrapZones(d, defender, trigger)
+  // 防御側の強化は戦闘するモンスターがいる時のみ(直接攻撃には強化できない)
+  const boostOptions =
+    battle.target !== 'direct'
+      ? d.players[defender].hand
+          .map((c, i) => ({ c, i }))
+          .filter(({ c }) => c.type === 'monster')
+          .map(({ i }) => i)
+      : []
+
+  if (trapZones.length > 0 || boostOptions.length > 0) {
+    d.pending = { kind: 'defenderReaction', forPlayer: defender, trapZones, boostOptions, battle }
+  } else {
+    resolveBattle(d, battle)
+  }
+}
+
+export type DefenderReactionChoice =
+  | { type: 'trap'; zone: number }
+  | { type: 'boost'; handIdx: number }
+  | null
+
+/** 防御側リアクションの応答 */
+export function respondReaction(s: GameState, choice: DefenderReactionChoice): GameState {
+  return produce(s, (d) => {
+    const pend = d.pending
+    if (!pend || pend.kind !== 'defenderReaction') return
+    d.pending = undefined
+    const battle = { ...pend.battle }
+    const defenderIdx = pend.forPlayer
+    const attackerIdx = other(defenderIdx)
+    const p = d.players[defenderIdx]
+
+    if (choice === null) {
+      resolveBattle(d, battle)
+      return
+    }
+
+    if (choice.type === 'boost') {
+      if (!pend.boostOptions.includes(choice.handIdx)) {
+        resolveBattle(d, battle)
+        return
+      }
+      const card = p.hand[choice.handIdx]
+      const defMonster = battle.target !== 'direct' ? p.monsters[battle.target] : null
+      if (card && card.type === 'monster' && defMonster) {
+        p.hand.splice(choice.handIdx, 1)
+        p.grave.push(card)
+        const value = boostValue(card, 'defender', defMonster.position, p.reinforceDoubledThisTurn)
+        battle.defenderBoost = value
+        log(
+          d,
+          `${p.name}は${card.name}を捨てて戦闘強化! ${defMonster.position === 'attack' ? '攻撃力' : '守備力'}+${value}(この戦闘の間)`,
+        )
+      }
+      resolveBattle(d, battle)
+      return
+    }
+
+    // 罠発動
+    const slot = pend.trapZones.includes(choice.zone) ? p.traps[choice.zone] : null
+    if (!slot) {
+      resolveBattle(d, battle)
+      return
+    }
+    p.traps[choice.zone] = null
+    p.grave.push(slot.card)
+    log(d, `${p.name}は罠「${slot.card.name}」を発動!`)
+
+    switch (slot.card.id) {
+      case 'N24': {
+        // 金縛り: 攻撃無効
+        log(d, '攻撃は無効化された')
+        return
+      }
+      case 'R14': {
+        // 神隠し: 攻撃モンスターを手札に戻す
+        const m = d.players[attackerIdx].monsters[battle.attackerZone]
+        if (m) {
+          d.players[attackerIdx].hand.push(m.card)
+          d.players[attackerIdx].monsters[battle.attackerZone] = null
+          log(d, `${m.card.name}は手札に戻された`)
+        }
+        return
+      }
+      case 'UR5': {
+        // アイギスの盾: 攻撃側の攻撃表示モンスターを全破壊
+        for (let z = 0; z < MONSTER_ZONES; z++) {
+          const m = d.players[attackerIdx].monsters[z]
+          if (m && m.position === 'attack') destroyMonster(d, attackerIdx, z, 'アイギスの盾')
+        }
+        return
+      }
+      case 'N28': {
+        // 砂かけ婆: 攻撃モンスター-600(ターン終了時まで)。戦闘は続行
+        const m = d.players[attackerIdx].monsters[battle.attackerZone]
+        if (m) {
+          m.buffs.push({ amount: -600, expiresAfterTurn: d.turnCount })
+          log(d, `${m.card.name}の攻撃力-600(ターン終了時まで)`)
+        }
+        resolveBattle(d, battle)
+        return
+      }
+      case 'R12': {
+        // 背水の陣: 手札からモンスターを選んで場に出す(必須選択)
+        const options = p.hand
+          .map((c, i) => ({ card: c, i }))
+          .filter(({ card }) => card.type === 'monster')
+          .map(({ i }) => ({ area: 'hand' as const, index: i }))
+        if (options.length === 0) {
+          resolveBattle(d, battle)
+          return
+        }
+        d.pending = {
+          kind: 'effectTarget',
+          forPlayer: defenderIdx,
+          sourceId: 'R12',
+          optional: false,
+          options,
+          ctx: { attackerZone: battle.attackerZone, attackerBoost: battle.attackerBoost },
+        }
+        return
+      }
+    }
+  })
+}
+
+/** ③ダメージ計算 */
+function resolveBattle(d: D, battle: BattleContext) {
   const me = d.turnPlayer
   const oppIdx = other(me)
-  const attacker = d.players[me].monsters[attackerZone]
+  const attacker = d.players[me].monsters[battle.attackerZone]
   if (!attacker) return // 罠で除去された場合など
 
-  const atk = effectiveAtk(attacker)
+  const atk = effectiveAtk(attacker) + battle.attackerBoost
 
-  if (target === 'direct') {
+  if (battle.target === 'direct') {
     d.players[oppIdx].life -= atk
     log(d, `直接攻撃! ${d.players[oppIdx].name}に${atk}ダメージ(残り${Math.max(0, d.players[oppIdx].life)})`)
     checkLifeWinner(d)
     return
   }
 
-  const defender = d.players[oppIdx].monsters[target]
+  const defender = d.players[oppIdx].monsters[battle.target]
   if (!defender) return
 
   const attackerIsMedusa = attacker.card.id === 'R08'
   const defenderIsMedusa = defender.card.id === 'R08'
 
   if (defender.position === 'attack') {
-    const dAtk = effectiveAtk(defender)
+    const dAtk = effectiveAtk(defender) + battle.defenderBoost
     if (atk > dAtk) {
       const diff = atk - dAtk
-      destroyMonster(d, oppIdx, target, '戦闘')
+      destroyMonster(d, oppIdx, battle.target, '戦闘')
       d.players[oppIdx].life -= diff
       log(d, `${d.players[oppIdx].name}に${diff}ダメージ(残り${Math.max(0, d.players[oppIdx].life)})`)
       if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     } else if (atk === dAtk) {
-      destroyMonster(d, oppIdx, target, '戦闘')
-      destroyMonster(d, me, attackerZone, '戦闘')
+      destroyMonster(d, oppIdx, battle.target, '戦闘')
+      destroyMonster(d, me, battle.attackerZone, '戦闘')
     } else {
       const diff = dAtk - atk
-      destroyMonster(d, me, attackerZone, '戦闘')
+      destroyMonster(d, me, battle.attackerZone, '戦闘')
       d.players[me].life -= diff
       log(d, `${d.players[me].name}に${diff}ダメージ(残り${Math.max(0, d.players[me].life)})`)
       if (attackerIsMedusa) defender.destroyAtEndOfTurn = true
     }
   } else {
-    const dDef = defender.card.def ?? 0
+    const dDef = (defender.card.def ?? 0) + battle.defenderBoost
     if (atk > dDef) {
-      destroyMonster(d, oppIdx, target, '戦闘')
+      destroyMonster(d, oppIdx, battle.target, '戦闘')
       if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     } else if (atk < dDef) {
       const diff = dDef - atk
