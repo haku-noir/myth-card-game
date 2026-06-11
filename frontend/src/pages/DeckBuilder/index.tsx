@@ -22,10 +22,12 @@ export default function DeckBuilder() {
   const [params] = useSearchParams()
   const editDeckId = params.get('deckId') ? Number(params.get('deckId')) : null
 
-  const storePool = useDeckBuildStore((s) => s.pool)
   const clearStore = useDeckBuildStore((s) => s.clear)
 
-  const [pool, setPoolState] = useState<Card[]>([])
+  // ストアのプールはマウント時に1回だけ取り込む(保存後にclearしても画面が消えないように)
+  const [pool, setPoolState] = useState<Card[]>(() =>
+    editDeckId ? [] : useDeckBuildStore.getState().pool,
+  )
   const [selectedIdx, setSelectedIdx] = useState<number[]>([]) // poolへのインデックス
   const [deckName, setDeckName] = useState('')
   const [sortKey, setSortKey] = useState<SortKey>('rarity')
@@ -34,7 +36,7 @@ export default function DeckBuilder() {
   const [error, setError] = useState('')
   const [savedId, setSavedId] = useState<number | null>(null)
 
-  // 初期化: 編集モードはサーバーから、新規はストアから
+  // 編集モードはサーバーからプールとデッキを復元する
   useEffect(() => {
     if (editDeckId) {
       fetchDeck(editDeckId)
@@ -57,10 +59,8 @@ export default function DeckBuilder() {
         })
         .catch((e: Error) => setError(e.message))
         .finally(() => setLoading(false))
-    } else {
-      setPoolState(storePool)
     }
-  }, [editDeckId, storePool])
+  }, [editDeckId])
 
   const selectedSet = useMemo(() => new Set(selectedIdx), [selectedIdx])
 
