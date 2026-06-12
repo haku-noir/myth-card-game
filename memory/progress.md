@@ -54,6 +54,14 @@ metadata:
   - 保存デッキはmigrate-deck-ids.tsで移行済み
   - 検証: 500ゲーム正常、easy vs hard = 26-74、PvP/ドラフト回帰OK
   - ゲーム名は「星の階」に変更済み
+- [x] v1.5アップデート — 完了 (コミット 2f42ed2, 9556f91, b7e0905)
+  - ブースト召喚の手札リリースを供物3種(豆狸N04/人魚姫N08/一反木綿N16,
+    handReleasable)限定に。エンジン2箇所(releaseOptionsFor候補+summon検証)
+  - 副作用: 壁メタ化でhardが膠着しnormalに逆転 → 守備表示相手への
+    安全マージン要求を撤廃して回復(51.5%/2400戦)。教訓: 守備表示への攻撃に
+    返り討ちは無いので慎重ロジックの適用は攻撃表示相手のみが正しい
+  - 計測ツール: simulate.tsに対戦カード絞り込み引数、scripts/diag.ts新設。
+    勝率の有意差判断は600戦以上で(100〜200戦は±7ptぶれる)
 - [x] CPU戦シールド戦 + おまかせ構築 — 完了 (コミット 40514fa, cbcfc33)
   - CPU戦の使用デッキ選択に「シールド戦」: /pack-opening?battle=cpu&difficulty=...
     で開封→構築→保存なしで対戦開始(DeckBuilderのhandleSealedStart)
