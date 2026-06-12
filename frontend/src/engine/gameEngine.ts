@@ -238,10 +238,10 @@ export function releaseOptionsFor(s: GameState, handIdx: number): ReleaseSpec[] 
     const starsAs = matches(m.card)
     if (starsAs !== false) out.push({ source: 'field', index: z, starsAs })
   })
-  // 手札のモンスター(召喚するカード自身は除く)。場に空きが必要
+  // 手札からは供物モンスター(handReleasable)のみリリース可(v1.5)。場に空きが必要
   if (firstEmptyZone(p) >= 0) {
     p.hand.forEach((c, i) => {
-      if (i === handIdx || c.type !== 'monster') return
+      if (i === handIdx || c.type !== 'monster' || !c.handReleasable) return
       const starsAs = matches(c)
       if (starsAs !== false) out.push({ source: 'hand', index: i, starsAs })
     })
@@ -277,6 +277,8 @@ export function summon(
         release.source === 'field' ? p.monsters[release.index]?.card : p.hand[release.index]
       if (!releasedCard || releasedCard.type !== 'monster') return
       if (release.source === 'hand' && release.index === handIdx) return
+      // v1.5: 手札からのリリースは供物モンスター(handReleasable)のみ
+      if (release.source === 'hand' && !releasedCard.handReleasable) return
 
       let releasedStars: number
       if (release.starsAs !== undefined) {

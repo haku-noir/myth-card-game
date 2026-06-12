@@ -1,7 +1,7 @@
 /**
  * エンジン検証用: CPU同士で多数のゲームを自動対戦させ、
  * クラッシュ・無限ループ・不変条件違反がないことを確認する。
- * 実行: npx tsx scripts/simulate.ts [ゲーム数]
+ * 実行: npx tsx scripts/simulate.ts [ゲーム数] [対戦カード(例: "normal vs hard")]
  */
 import { CARDS } from '../src/data/cards'
 import { buildCpuDeck } from '../src/engine/cpuDeck'
@@ -150,13 +150,19 @@ function runGame(diffs: [Difficulty, Difficulty], verbose = false): GameState {
 }
 
 const games = Number(process.argv[2] ?? 200)
-const matchups: [Difficulty, Difficulty][] = [
+const allMatchups: [Difficulty, Difficulty][] = [
   ['easy', 'easy'],
   ['normal', 'normal'],
   ['hard', 'hard'],
   ['easy', 'hard'],
   ['normal', 'hard'],
 ]
+// 第2引数で対戦カードを絞り込める(例: "normal vs hard")
+const filter = process.argv[3]
+const matchups = filter
+  ? allMatchups.filter(([a, b]) => `${a} vs ${b}` === filter)
+  : allMatchups
+if (matchups.length === 0) throw new Error(`不明な対戦カード: ${filter}`)
 
 console.log(`${games}ゲームを実行中...`)
 const stats = new Map<string, { wins: [number, number]; turns: number[]; deckout: number }>()
