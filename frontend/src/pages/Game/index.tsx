@@ -20,15 +20,17 @@ function DeckPicker({
   loading,
   deckId,
   onSelect,
+  title = '使用デッキ',
 }: {
   decks: SavedDeck[]
   loading: boolean
   deckId: number | null
   onSelect: (id: number) => void
+  title?: string
 }) {
   return (
     <section>
-      <h2 className="mb-2 font-semibold">使用デッキ</h2>
+      <h2 className="mb-2 font-semibold">{title}</h2>
       {loading && <p className="text-slate-400">読み込み中...</p>}
       {!loading && decks.length === 0 && (
         <div className="rounded bg-slate-800 p-4 text-sm text-slate-400">
@@ -73,15 +75,22 @@ function useSavedDecks(preselect: number | null) {
 // ============================================================
 
 function CpuSetup() {
+  const navigate = useNavigate()
   const [params] = useSearchParams()
   const preselect = params.get('deckId') ? Number(params.get('deckId')) : null
   const { decks, deckId, setDeckId, loading, error: deckError } = useSavedDecks(preselect)
+  // sealed: パック開封→構築→そのまま対戦のシールド戦
+  const [sealed, setSealed] = useState(false)
   const [difficulty, setDifficulty] = useState<Difficulty>('normal')
   const [starting, setStarting] = useState(false)
   const [error, setError] = useState('')
   const startCpuGame = useGameStore((s) => s.startCpuGame)
 
   const handleStart = async () => {
+    if (sealed) {
+      navigate(`/pack-opening?battle=cpu&difficulty=${difficulty}`)
+      return
+    }
     const deck = decks.find((d) => d.id === deckId)
     if (!deck) return
     setStarting(true)
@@ -110,7 +119,25 @@ function CpuSetup() {
         <p className="rounded bg-red-900/50 p-3 text-sm text-red-300">{error || deckError}</p>
       )}
 
-      <DeckPicker decks={decks} loading={loading} deckId={deckId} onSelect={setDeckId} />
+      <section>
+        <h2 className="mb-2 font-semibold">使用デッキ</h2>
+        <label
+          className={`mb-4 flex cursor-pointer items-center gap-3 rounded-lg p-3 ${sealed ? 'bg-amber-900/50 ring-1 ring-amber-400' : 'bg-slate-800'}`}
+        >
+          <input type="radio" checked={sealed} onChange={() => setSealed(true)} />
+          <span>
+            <span className="font-semibold">シールド戦</span>
+            <span className="ml-2 text-xs text-slate-400">パック開封 → デッキ構築 → そのままバトル</span>
+          </span>
+        </label>
+        <DeckPicker
+          title="保存デッキ"
+          decks={decks}
+          loading={loading}
+          deckId={sealed ? null : deckId}
+          onSelect={(id) => { setSealed(false); setDeckId(id) }}
+        />
+      </section>
 
       <section>
         <h2 className="mb-2 font-semibold">CPUの強さ</h2>
@@ -129,10 +156,10 @@ function CpuSetup() {
 
       <button
         onClick={handleStart}
-        disabled={deckId === null || starting}
+        disabled={(!sealed && deckId === null) || starting}
         className="rounded-lg bg-emerald-700 py-4 text-lg font-bold hover:bg-emerald-600 disabled:opacity-40"
       >
-        {starting ? '準備中...' : '対戦開始'}
+        {starting ? '準備中...' : sealed ? 'パック開封へ' : '対戦開始'}
       </button>
     </div>
   )

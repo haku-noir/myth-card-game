@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { createDeck, updateDeck, fetchDeck } from '../../api/decks'
+import { openPacks } from '../../api/packs'
 import { cardById } from '../../data/cards'
-import { buildDeckIndices } from '../../engine/cpuDeck'
+import { buildCpuDeck, buildDeckIndices } from '../../engine/cpuDeck'
+import { useGameStore } from '../../store/gameStore'
 import type { Card } from '../../types/card'
+import type { Difficulty } from '../../types/game'
 import { DECK_SIZE } from '../../types/deck'
 import CardFace from '../../components/card/CardFace'
 import Modal from '../../components/common/Modal'
@@ -22,6 +25,12 @@ export default function DeckBuilder() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const editDeckId = params.get('deckId') ? Number(params.get('deckId')) : null
+  // battle=cpu のときはCPU戦シールド戦: 保存せずそのまま対戦を開始する
+  const cpuBattle = params.get('battle') === 'cpu'
+  const difficulty: Difficulty = (['easy', 'normal', 'hard'] as const).find(
+    (d) => d === params.get('difficulty'),
+  ) ?? 'normal'
+  const startCpuGame = useGameStore((s) => s.startCpuGame)
 
   const clearStore = useDeckBuildStore((s) => s.clear)
 
@@ -105,6 +114,23 @@ export default function DeckBuilder() {
     setSelectedIdx(buildDeckIndices(pool))
   }
 
+  // シールド戦: CPUデッキを開封・構築してそのまま対戦開始
+  const handleSealedStart = async () => {
+    setSaving(true)
+    setError('')
+    try {
+      const playerDeck = selectedIdx.map((i) => pool[i])
+      const packs = await openPacks(4)
+      const cpuDeck = buildCpuDeck(packs.flatMap((p) => p.cards))
+      clearStore()
+      startCpuGame(playerDeck, 'シールドデッキ', cpuDeck, difficulty)
+      navigate('/game?mode=cpu')
+    } catch (e) {
+      setError((e as Error).message)
+      setSaving(false)
+    }
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError('')
@@ -132,7 +158,10 @@ export default function DeckBuilder() {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-slate-400">手持ちカードがありません。パックを開封してください。</p>
-        <Link to="/pack-opening" className="rounded bg-indigo-600 px-6 py-2 hover:bg-indigo-500">
+        <Link
+          to={cpuBattle ? `/pack-opening?${params.toString()}` : '/pack-opening'}
+          className="rounded bg-indigo-600 px-6 py-2 hover:bg-indigo-500"
+        >
           パック開封へ
         </Link>
       </div>
@@ -143,13 +172,17 @@ export default function DeckBuilder() {
     <div className="mx-auto max-w-7xl p-4">
       <div className="mb-4 flex flex-wrap items-center gap-4">
         <Link to="/" className="text-slate-400 hover:text-white">← ホーム</Link>
-        <h1 className="text-xl font-bold">{editDeckId ? 'デッキ編集' : 'デッキ構築'}</h1>
-        <input
-          className="rounded bg-slate-800 px-3 py-2 text-sm"
-          placeholder="デッキ名(省略可)"
-          value={deckName}
-          onChange={(e) => setDeckName(e.target.value)}
-        />
+        <h1 className="text-xl font-bold">
+          {cpuBattle ? 'デッキ構築(シールド戦)' : editDeckId ? 'デッキ編集' : 'デッキ構築'}
+        </h1>
+        {!cpuBattle && (
+          <input
+            className="rounded bg-slate-800 px-3 py-2 text-sm"
+            placeholder="デッキ名(省略可)"
+            value={deckName}
+            onChange={(e) => setDeckName(e.target.value)}
+          />
+        )}
         <span className={`text-lg font-bold ${selectedIdx.length === DECK_SIZE ? 'text-emerald-400' : 'text-amber-400'}`}>
           {selectedIdx.length} / {DECK_SIZE}枚
         </span>
@@ -160,11 +193,13 @@ export default function DeckBuilder() {
           おまかせ構築
         </button>
         <button
-          onClick={handleSave}
+          onClick={cpuBattle ? handleSealedStart : handleSave}
           disabled={selectedIdx.length !== DECK_SIZE || saving}
           className="ml-auto rounded bg-emerald-700 px-6 py-2 font-semibold hover:bg-emerald-600 disabled:opacity-40"
         >
-          {saving ? '保存中...' : '保存して確定する'}
+          {cpuBattle
+            ? saving ? '準備中...' : 'このデッキで対戦開始'
+            : saving ? '保存中...' : '保存して確定する'}
         </button>
       </div>
 

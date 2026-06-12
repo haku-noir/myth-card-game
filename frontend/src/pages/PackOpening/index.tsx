@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { openPacks, type OpenedPack } from '../../api/packs'
 import type { Card } from '../../types/card'
 import CardFace from '../../components/card/CardFace'
@@ -11,6 +11,8 @@ const rarityOrder = { UR: 0, SR: 1, R: 2, N: 3 } as const
 
 export default function PackOpening() {
   const navigate = useNavigate()
+  // battle=cpu のときはCPU戦シールド戦: 構築画面へパラメータを引き継ぐ
+  const [params] = useSearchParams()
   const setPool = useDeckBuildStore((s) => s.setPool)
 
   const [packs, setPacks] = useState<OpenedPack[] | null>(null)
@@ -41,7 +43,8 @@ export default function PackOpening() {
 
   const goToBuilder = () => {
     setPool(allCards)
-    navigate('/deck-builder')
+    const query = params.toString()
+    navigate(query ? `/deck-builder?${query}` : '/deck-builder')
   }
 
   if (error) {
@@ -93,6 +96,9 @@ export default function PackOpening() {
       <div className="flex items-center gap-4">
         <h1 className="text-2xl font-bold">パック開封</h1>
         <span className="text-slate-400">{openedCount + 1} / {PACK_COUNT}パック目</span>
+        {params.get('battle') === 'cpu' && (
+          <span className="rounded bg-amber-900/60 px-2 py-1 text-xs font-semibold text-amber-300">CPU戦シールド戦</span>
+        )}
       </div>
 
       {!revealed ? (
