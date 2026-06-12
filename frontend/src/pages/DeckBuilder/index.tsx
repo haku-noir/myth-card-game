@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { createDeck, updateDeck, fetchDeck } from '../../api/decks'
 import { cardById } from '../../data/cards'
+import { buildDeckIndices } from '../../engine/cpuDeck'
 import type { Card } from '../../types/card'
 import { DECK_SIZE } from '../../types/deck'
 import CardFace from '../../components/card/CardFace'
@@ -99,6 +100,11 @@ export default function DeckBuilder() {
     setSelectedIdx((prev) => prev.filter((i) => i !== poolIdx))
   }
 
+  // CPUのデッキ構築ロジックで20枚を自動選択する
+  const autoBuild = () => {
+    setSelectedIdx(buildDeckIndices(pool))
+  }
+
   const handleSave = async () => {
     setSaving(true)
     setError('')
@@ -147,6 +153,12 @@ export default function DeckBuilder() {
         <span className={`text-lg font-bold ${selectedIdx.length === DECK_SIZE ? 'text-emerald-400' : 'text-amber-400'}`}>
           {selectedIdx.length} / {DECK_SIZE}枚
         </span>
+        <button
+          onClick={autoBuild}
+          className="rounded bg-indigo-700 px-4 py-2 text-sm font-semibold hover:bg-indigo-600"
+        >
+          おまかせ構築
+        </button>
         <button
           onClick={handleSave}
           disabled={selectedIdx.length !== DECK_SIZE || saving}

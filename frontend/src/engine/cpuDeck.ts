@@ -25,11 +25,12 @@ const SPELL_SCORE: Record<string, number> = {
 const rarityBonus = { N: 0, R: 100, SR: 200, UR: 300 } as const
 
 /**
- * 開封した40枚からCPU用の20枚デッキを自動構築する。
+ * 開封した40枚から20枚デッキを自動構築し、プール内インデックスで返す。
  * 方針: モンスター約13枚(低星厚め+高星少々) + 除去中心の魔法・罠約7枚
  * 同名カードを区別するためインデックスで管理する。
+ * CPUのデッキ構築と、デッキ構築画面の「おまかせ構築」で共用する。
  */
-export function buildCpuDeck(pool: Card[]): Card[] {
+export function buildDeckIndices(pool: Card[]): number[] {
   const entries = pool.map((card, idx) => ({ card, idx }))
   const monsters = entries.filter(({ card }) => card.type === 'monster')
   const spells = entries.filter(({ card }) => card.type !== 'monster')
@@ -63,5 +64,10 @@ export function buildCpuDeck(pool: Card[]): Card[] {
     picked.push(...rest.slice(0, DECK_SIZE - picked.length))
   }
 
-  return picked.slice(0, DECK_SIZE).map((e) => e.card)
+  return picked.slice(0, DECK_SIZE).map((e) => e.idx)
+}
+
+/** 開封した40枚からCPU用の20枚デッキを自動構築する */
+export function buildCpuDeck(pool: Card[]): Card[] {
+  return buildDeckIndices(pool).map((i) => pool[i])
 }
