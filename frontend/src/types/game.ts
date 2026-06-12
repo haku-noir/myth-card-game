@@ -45,7 +45,7 @@ export interface PlayerState {
   reinforceDoubledThisTurn: boolean // お焚き上げ(N29)発動中
 }
 
-/** ブースト召喚のリリース指定(v1.2: 手札または場から1体) */
+/** 召喚時のリリース指定(手札の供物または場から1体) */
 export interface ReleaseSpec {
   source: 'hand' | 'field'
   index: number

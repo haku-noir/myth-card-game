@@ -1,25 +1,25 @@
 import type { Card } from '../types/card'
 
-// カードマスタデータ(docs/カードリスト_v1.5.md 準拠・全53種)
+// カードマスタデータ(docs/カードリスト_v1.5.2.md 準拠・全53種)
 export const CARDS: Card[] = [
   // ノーマル(N) モンスター 19種
   { id: 'N01', name: '一寸法師', type: 'monster', rarity: 'N', stars: 1, atk: 500, def: 300, effectText: '' },
   { id: 'N02', name: 'コロポックル', type: 'monster', rarity: 'N', stars: 1, atk: 400, def: 400, effectText: '' },
   { id: 'N03', name: '鬼火', type: 'monster', rarity: 'N', stars: 1, atk: 600, def: 100, effectText: '戦闘強化として攻撃側が捨てる場合、+100ではなく+1000として扱う。' },
-  { id: 'N04', name: '豆狸', type: 'monster', rarity: 'N', stars: 1, atk: 200, def: 600, effectText: 'ブースト召喚のリリースとして、手札からリリースできる。', handReleasable: true },
+  { id: 'N04', name: '豆狸', type: 'monster', rarity: 'N', stars: 1, atk: 200, def: 600, effectText: '召喚のリリースとして、手札からリリースできる。', handReleasable: true },
   { id: 'N05', name: '座敷童子', type: 'monster', rarity: 'N', stars: 1, atk: 300, def: 200, effectText: '召喚時、カードを1枚ドローする。' },
   { id: 'N06', name: '河童', type: 'monster', rarity: 'N', stars: 2, atk: 700, def: 700, effectText: '' },
   { id: 'N07', name: '金太郎', type: 'monster', rarity: 'N', stars: 2, atk: 900, def: 500, effectText: '' },
-  { id: 'N08', name: '人魚姫', type: 'monster', rarity: 'N', stars: 2, atk: 700, def: 800, effectText: 'ブースト召喚のリリースとして、手札からリリースできる。', handReleasable: true },
+  { id: 'N08', name: '人魚姫', type: 'monster', rarity: 'N', stars: 2, atk: 700, def: 800, effectText: '召喚のリリースとして、手札からリリースできる。', handReleasable: true },
   { id: 'N09', name: 'ろくろ首', type: 'monster', rarity: 'N', stars: 2, atk: 500, def: 900, effectText: '' },
   { id: 'N10', name: 'ぬりかべ', type: 'monster', rarity: 'N', stars: 2, atk: 100, def: 1200, effectText: '戦闘強化として守備表示の自分モンスターのために捨てる場合、+800として扱う。' },
   { id: 'N11', name: '雪女', type: 'monster', rarity: 'N', stars: 2, atk: 500, def: 700, effectText: '召喚時、相手モンスター1体を守備表示にできる。' },
-  { id: 'N26', name: '化け狸', type: 'monster', rarity: 'N', stars: 2, atk: 500, def: 500, effectText: 'リリースする場合、星1〜3の好きな値として扱える。', releaseStarRange: { min: 1, max: 3 } },
+  { id: 'N26', name: '化け狸', type: 'monster', rarity: 'N', stars: 2, atk: 500, def: 500, effectText: 'リリースする場合、星3として扱える。', releaseStarRange: { min: 1, max: 3 } },
   { id: 'N12', name: '桃太郎', type: 'monster', rarity: 'N', stars: 3, atk: 1300, def: 800, effectText: '' },
   { id: 'N13', name: '天狗', type: 'monster', rarity: 'N', stars: 3, atk: 1200, def: 900, effectText: '' },
   { id: 'N14', name: '一つ目小僧', type: 'monster', rarity: 'N', stars: 3, atk: 1100, def: 1000, effectText: '' },
   { id: 'N15', name: 'ケンタウロス', type: 'monster', rarity: 'N', stars: 3, atk: 1200, def: 1100, effectText: '' },
-  { id: 'N16', name: '一反木綿', type: 'monster', rarity: 'N', stars: 3, atk: 1100, def: 600, effectText: 'ブースト召喚のリリースとして、手札からリリースできる。', handReleasable: true },
+  { id: 'N16', name: '一反木綿', type: 'monster', rarity: 'N', stars: 3, atk: 1100, def: 600, effectText: '召喚のリリースとして、手札からリリースできる。', handReleasable: true },
   { id: 'N17', name: '卑弥呼', type: 'monster', rarity: 'N', stars: 3, atk: 800, def: 800, effectText: '召喚時、相手の伏せカード1枚を確認できる。' },
   { id: 'N18', name: '浦島太郎', type: 'monster', rarity: 'N', stars: 3, atk: 800, def: 800, effectText: '召喚時、自分の墓地のカード1枚を手札に戻せる。' },
   // ノーマル(N) 魔法・罠 8種
@@ -36,7 +36,7 @@ export const CARDS: Card[] = [
   { id: 'R02', name: '源義経', type: 'monster', rarity: 'R', stars: 4, atk: 1700, def: 900, effectText: '' },
   { id: 'R03', name: 'グリフォン', type: 'monster', rarity: 'R', stars: 4, atk: 1600, def: 1400, effectText: '' },
   { id: 'R04', name: '安倍晴明', type: 'monster', rarity: 'R', stars: 4, atk: 1300, def: 1000, effectText: '召喚時、自分のデッキから魔法・罠カード1枚を手札に加えられる。' },
-  { id: 'R13', name: '鵺', type: 'monster', rarity: 'R', stars: 4, atk: 1200, def: 1000, effectText: 'リリースする場合、星1〜5の好きな値として扱える。', releaseStarRange: { min: 1, max: 5 } },
+  { id: 'R13', name: '鵺', type: 'monster', rarity: 'R', stars: 4, atk: 1200, def: 1000, effectText: 'リリースする場合、星5として扱える。', releaseStarRange: { min: 1, max: 5 } },
   { id: 'R05', name: '宮本武蔵', type: 'monster', rarity: 'R', stars: 5, atk: 1900, def: 1300, effectText: '' },
   { id: 'R06', name: '武蔵坊弁慶', type: 'monster', rarity: 'R', stars: 5, atk: 1500, def: 1900, effectText: '' },
   { id: 'R07', name: '九尾の狐', type: 'monster', rarity: 'R', stars: 5, atk: 1500, def: 1200, effectText: '召喚時、相手モンスター1体を守備表示にできる。' },

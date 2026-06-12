@@ -76,8 +76,8 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
           )
         } else if (releaseOptionsFor(game, i).length > 0) {
           handMenuItems.push(
-            { label: 'ブースト召喚(攻撃表示)', onClick: () => setSel({ mode: 'selectRelease', handIdx: i, position: 'attack' }) },
-            { label: 'ブースト召喚(守備表示)', onClick: () => setSel({ mode: 'selectRelease', handIdx: i, position: 'defense' }) },
+            { label: 'リリースして召喚(攻撃表示)', onClick: () => setSel({ mode: 'selectRelease', handIdx: i, position: 'attack' }) },
+            { label: 'リリースして召喚(守備表示)', onClick: () => setSel({ mode: 'selectRelease', handIdx: i, position: 'defense' }) },
           )
         }
       } else if (handCard.type === 'magic' && canCastMagic(game, i)) {
@@ -101,7 +101,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
   }
 
   // ---- クリックハンドラ ----
-  // ぴったりブースト召喚のリリース候補(手札・場の両方)
+  // 召喚時のリリース候補(手札・場の両方)
   const releaseSpecs =
     sel.mode === 'selectRelease' && validatorsActive ? releaseOptionsFor(game, sel.handIdx) : []
   const releaseFieldZones = releaseSpecs.filter((r) => r.source === 'field').map((r) => r.index)
@@ -432,7 +432,7 @@ export default function Board({ game, mySeat, act, busy, busyLabel, onExit, onRe
               size="sm"
               onClick={() => {
                 if (pending || game.winner !== undefined) return
-                // ブースト召喚のリリース選択中: 手札のカードもリリース候補
+                // 召喚のリリース選択中: 手札のカードもリリース候補
                 if (sel.mode === 'selectRelease') {
                   const spec = releaseSpecs.find((r) => r.source === 'hand' && r.index === i)
                   if (spec) {

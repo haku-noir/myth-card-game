@@ -191,7 +191,7 @@ function placeMonster(
 }
 
 // ============================================================
-// 召喚(v1.2: 1ターン1回、ぴったりブースト)
+// 召喚(v1.5.2: 1ターン1回、任意のリリースで星を生み出し「以下」の星を召喚)
 // ============================================================
 
 /** 手札のモンスターが通常召喚可能か(リリースなし) */
@@ -210,9 +210,9 @@ export function canSummon(s: GameState, handIdx: number): boolean {
 }
 
 /**
- * ブースト召喚のリリース候補(ぴったり一致のみ)。
- * 必要星 = 召喚したい星 - レベル。手札と場の両方から探す。
- * 可変星モンスターは範囲内なら starsAs=必要星 で候補になる。
+ * 召喚時のリリース候補(v1.5.2: レベル+リリース星「以下」の星を召喚可)。
+ * 必要星 = 召喚したい星 - レベル。星が足りるリリース元を手札(供物のみ)と場から探す。
+ * 可変星モンスターは最大値(starsAs=range.max)として扱う(「以下」ルールでは小さく数える意味がない)。
  */
 export function releaseOptionsFor(s: GameState, handIdx: number): ReleaseSpec[] {
   const p = s.players[s.turnPlayer]
@@ -222,13 +222,12 @@ export function releaseOptionsFor(s: GameState, handIdx: number): ReleaseSpec[] 
   const needed = (card.stars ?? 99) - p.level
   if (needed < 1) return [] // レベル以下は通常召喚で出せる
 
+  // v1.5.2: 生み出す星が必要星「以上」なら召喚できる(余剰は切り捨て)
   const matches = (c: Card): ReleaseSpec['starsAs'] | false => {
     if (c.releaseStarRange) {
-      return c.releaseStarRange.min <= needed && needed <= c.releaseStarRange.max
-        ? needed
-        : false
+      return c.releaseStarRange.max >= needed ? c.releaseStarRange.max : false
     }
-    return c.stars === needed ? undefined : false
+    return (c.stars ?? 0) >= needed ? undefined : false
   }
 
   const out: ReleaseSpec[] = []
@@ -250,7 +249,7 @@ export function releaseOptionsFor(s: GameState, handIdx: number): ReleaseSpec[] 
 }
 
 /**
- * 召喚(release指定でぴったりブースト召喚)。1ターン1回。
+ * 召喚(release指定で星を生み出し、レベル+星「以下」を召喚)。1ターン1回。
  * 相手に落とし穴があれば罠確認のpendingを立てる。
  */
 export function summon(
@@ -268,11 +267,11 @@ export function summon(
     const stars = card.stars ?? 99
 
     if (release === undefined) {
-      // 通常召喚
+      // リリースなし: レベル以下の星を召喚
       if (stars > p.level || firstEmptyZone(p) < 0) return
       p.hand.splice(handIdx, 1)
     } else {
-      // ぴったりブースト召喚
+      // リリースあり: 生み出した星を加算し、合計「以下」の星を召喚(v1.5.2)
       const releasedCard =
         release.source === 'field' ? p.monsters[release.index]?.card : p.hand[release.index]
       if (!releasedCard || releasedCard.type !== 'monster') return
@@ -289,17 +288,17 @@ export function summon(
         if (releasedCard.releaseStarRange) return // 可変星はstarsAs必須
         releasedStars = releasedCard.stars ?? 0
       }
-      if (stars !== p.level + releasedStars) return // ぴったり一致のみ
+      if (stars > p.level + releasedStars) return // レベル+生み出した星「以下」のみ(v1.5.2)
 
       // リリース実行(リリースは破壊ではない)
       if (release.source === 'field') {
-        log(d, `${p.name}は場の${releasedCard.name}をリリース(星${releasedStars}として)`)
+        log(d, `${p.name}は場の${releasedCard.name}をリリース(星${releasedStars}を生成)`)
         p.grave.push(releasedCard)
         p.monsters[release.index] = null
         p.hand.splice(handIdx, 1)
       } else {
         if (firstEmptyZone(p) < 0) return
-        log(d, `${p.name}は手札の${releasedCard.name}をリリース(星${releasedStars}として)`)
+        log(d, `${p.name}は手札の${releasedCard.name}をリリース(星${releasedStars}を生成)`)
         // 手札から召喚カードとリリースカードの2枚を取り除く(大きいインデックスから)
         const [hi, lo] =
           release.index > handIdx ? [release.index, handIdx] : [handIdx, release.index]
@@ -323,7 +322,7 @@ export function summon(
     p.summonUsedThisTurn = true
     log(
       d,
-      `${p.name}は${card.name}を${position === 'attack' ? '攻撃' : '守備'}表示で${release ? 'ブースト召喚' : '召喚'}`,
+      `${p.name}は${card.name}を${position === 'attack' ? '攻撃' : '守備'}表示で召喚`,
     )
 
     // 相手の罠チェック(召喚トリガー: 落とし穴)

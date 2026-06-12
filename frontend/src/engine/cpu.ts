@@ -182,8 +182,8 @@ export function nextMainAction(s: GameState, me: PlayerIdx, diff: Difficulty): C
 }
 
 /**
- * 召喚判断(v1.2: 1ターン1回・ぴったりブースト)。
- * 通常召喚の最良とブースト召喚の最良を比較して決める。
+ * 召喚判断(v1.5.2: 1ターン1回・リリースで星を生み出し「以下」の星を召喚)。
+ * リリースなし召喚の最良とリリース召喚の最良を比較して決める。
  * 倒しようのない大型が相手にいる場合は守備表示の壁を優先する。
  */
 function decideSummon(s: GameState, me: PlayerIdx, diff: Difficulty): CpuMainAction | null {
@@ -198,7 +198,7 @@ function decideSummon(s: GameState, me: PlayerIdx, diff: Difficulty): CpuMainAct
     if (!bestNormal || atk > bestNormal.atk) bestNormal = { handIdx: i, atk }
   }
 
-  // ブースト召喚の最良(リリースの損失を引いた純益で評価)
+  // リリース召喚の最良(リリースの損失を引いた純益で評価)
   let bestBoost: { handIdx: number; release: ReleaseSpec; net: number; atk: number } | null = null
   if (diff !== 'easy') {
     for (let i = 0; i < p.hand.length; i++) {
