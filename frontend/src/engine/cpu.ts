@@ -16,6 +16,7 @@ import {
   canSetTrap,
   canSummon,
   effectiveAtk,
+  effectiveDef,
   magicTargets,
   other,
   releaseOptionsFor,
@@ -60,10 +61,16 @@ export function nextMainAction(s: GameState, me: PlayerIdx, diff: Difficulty): C
 
     switch (card.id) {
       case 'UR4': {
-        // 天罰: 易=1体でも使う / 普通・難=2体以上か高打点
+        // 天罰(v1.6: お互い全破壊): 盤面で負けている時の逆転札として使う
         const count = oppMonsters.length
+        const myMon = fieldMonsters(s, me)
         const totalAtk = oppMonsters.reduce((sum, { m }) => sum + atkOf(m), 0)
-        if (diff === 'easy' ? count >= 1 : count >= 2 || totalAtk >= 2300) {
+        const myTotalAtk = myMon.reduce((sum, { m }) => sum + atkOf(m), 0)
+        const ok =
+          diff === 'easy'
+            ? count >= 1 && count >= myMon.length
+            : totalAtk - myTotalAtk >= 1500 || count - myMon.length >= 2
+        if (ok) {
           return { type: 'magic', handIdx: i }
         }
         break
@@ -291,18 +298,18 @@ export function nextAttack(
     return { attackerZone: attackers[0].zone, target: 'direct' }
   }
 
-  // --- 難: 返り討ち回避ロジック ---
+  // --- 難: 守備の反撃(v1.6)回避ロジック ---
   // 相手が手札(戦闘強化)や伏せ罠でリアクションできるかは公開情報から判断する
   const oppTrapCount = opp.traps.filter(Boolean).length
   const oppCanBoost = opp.hand.length > 0
   const oppCanReact = oppCanBoost || oppTrapCount > 0
   // 安全マージン: 600差なら相手は★7を捨てないと返せない。伏せがある時は砂かけ婆(-600)を見て700
   const safeMargin = oppTrapCount > 0 ? 700 : 600
-  // 「強化込みで攻撃」が許されるのは相手にリアクション手段がない時だけ
+  // 「強化込みで攻撃」を計画できる値(decideBoostが実行する)
   const planBoost = diff === 'hard' ? maxCheapBoost(s, me) : 0
-  // デッキ切れ間際で膠着が不利なら、慎重さを捨てて攻める
+  // デッキ切れ間際で膠着が不利なら、慎重さを捨てて攻める(v1.6: 膠着しやすいため早めに発動)
   const myDeck = s.players[me].deck.length
-  const desperate = myDeck <= 6 && myDeck <= opp.deck.length + 1
+  const desperate = myDeck <= 8 && myDeck <= opp.deck.length + 1
 
   for (const { m: attacker, zone } of attackers) {
     const atk = atkOf(attacker)
@@ -313,33 +320,35 @@ export function nextAttack(
       const isMedusa = defender.card.id === 'R08'
       if (diff === 'hard' && isMedusa && atk >= 2000) continue
 
-      const dValue = defender.position === 'attack' ? atkOf(defender) : (defender.card.def ?? 0)
+      const dValue = defender.position === 'attack' ? atkOf(defender) : effectiveDef(defender)
       // 除去価値(攻撃表示は与ダメも加点)
       const score =
         defender.position === 'attack' ? (atk - dValue) + dValue * 0.5 : dValue * 0.4
 
       if (diff === 'hard') {
-        if (!oppCanReact || desperate) {
-          // 相手がリアクション不能、または膠着がデッキ切れ負けに繋がる状況:
-          // 素で勝てる、または強化込みで勝てるなら攻撃
+        if (defender.position === 'attack') {
+          // v1.6: 攻撃表示への攻撃は負けても破壊されないローリスク。
+          // 素で勝てる/強化込みで勝てるなら攻撃、1500以上との相打ちも許容
+          if (atk > dValue || (planBoost > 0 && atk + planBoost > dValue)) {
+            if (!best || score > best.score) best = { target: t, score }
+          } else if (atk === dValue && dValue >= 1500) {
+            if (!best || dValue * 0.3 > best.score) best = { target: t, score: dValue * 0.3 }
+          }
+        } else if (!oppCanReact || desperate) {
+          // 守備表示でも相手がリアクション不能(または膠着がデッキ切れ負けに繋がる)なら、
+          // 素で勝てる/強化込みで勝てるなら攻撃
           if (atk > dValue || (planBoost > 0 && atk + planBoost > dValue)) {
             if (!best || score > best.score) best = { target: t, score }
           }
-        } else if (defender.position === 'defense') {
-          // 守備表示への攻撃は返り討ち(攻撃側破壊)がルール上起こり得ない。
-          // 最悪でも強化・砂かけ婆で止められて差分の自傷ダメージのみなので、素で勝てれば攻める
-          if (atk > dValue) {
-            if (!best || score > best.score) best = { target: t, score }
-          }
         } else {
-          // 相手はリアクション可能: 返り討ちを警戒する
+          // v1.6: 守備表示への攻撃は守備の反撃(攻撃側破壊)を警戒する
           const margin = atk - dValue
           const ok =
             margin >= safeMargin || // 十分な打点差(ひっくり返すには★6〜7の犠牲が必要)
             (planBoost > 0 && margin + planBoost >= safeMargin) || // 自分の強化で安全圏へ(decideBoostが実行)
             (margin > 0 && opp.hand.length <= 1 && oppTrapCount === 0) // 相手の対抗手段がほぼ無い
           if (ok && (!best || score > best.score)) best = { target: t, score }
-          // 打点差がほとんどない相手には攻撃しない(返り討ち・相打ち回避)
+          // 打点差がほとんどない壁には攻撃しない(反撃キル回避)
         }
       } else {
         // 易・普通: 従来どおり素の値で勝てる時のみ
@@ -403,24 +412,26 @@ export function decideBoost(s: GameState, me: PlayerIdx, diff: Difficulty): numb
 
   const defender = s.players[oppIdx].monsters[battle.target]
   if (!defender) return null
-  const defValue = defender.position === 'attack' ? atkOf(defender) : (defender.card.def ?? 0)
+  const defValue = defender.position === 'attack' ? atkOf(defender) : effectiveDef(defender)
   const margin = atk - defValue
 
   if (diff === 'hard') {
-    // 守備表示相手は返り討ちが無いため、マージン確保の強化は浪費(負け宣言はそもそもしない)
-    if (defender.position === 'defense') {
+    // v1.6: 攻撃表示相手は負けても破壊されないため、強化は「勝ち(破壊+ダメージ)を取る」
+    // ためだけに使う。負けているなら最小コストで逆転
+    if (defender.position === 'attack') {
       if (margin > 0) return null
       for (const c of candidates) {
         if (atk + c.value > defValue) return c.handIdx
       }
       return null
     }
-    // 難: 相手のリアクション(手札強化・伏せ罠)を見越して安全マージンを確保する。
+    // v1.6: 守備表示相手は守備の反撃(攻撃側破壊)があるため、相手のリアクション
+    // (手札強化・伏せ罠)を見越して安全マージンを確保する。
     // nextAttackがこの強化を前提に攻撃宣言している
     const oppTrapCount = s.players[oppIdx].traps.filter(Boolean).length
     const oppCanReact = s.players[oppIdx].hand.length > 0 || oppTrapCount > 0
     const myDeck = p.deck.length
-    const desperate = myDeck <= 6 && myDeck <= s.players[oppIdx].deck.length + 1
+    const desperate = myDeck <= 8 && myDeck <= s.players[oppIdx].deck.length + 1
     if (!oppCanReact || desperate) {
       // リアクション不能: 素で勝てるなら温存、負けているなら最小コストで逆転
       if (margin > 0) return null
@@ -473,7 +484,7 @@ export function decideReaction(s: GameState, me: PlayerIdx, diff: Difficulty): R
   const defValue = defender
     ? defender.position === 'attack'
       ? atkOf(defender)
-      : (defender.card.def ?? 0)
+      : effectiveDef(defender)
     : 0
   // この攻撃を通した場合の想定被ダメージ
   const expectedDmg =
@@ -520,7 +531,7 @@ export function decideReaction(s: GameState, me: PlayerIdx, diff: Difficulty): R
         break
       }
       case 'N28': {
-        // 砂かけ婆: -600で戦闘がひっくり返る、または直撃の軽減
+        // 砂かけ婆: -600で戦闘がひっくり返る(守備表示なら反撃キルに繋がる)、または直撃の軽減
         if (defender && attackerValue > defValue && attackerValue - 600 < defValue) {
           return { type: 'trap', zone }
         }
@@ -556,15 +567,20 @@ export function decideReaction(s: GameState, me: PlayerIdx, diff: Difficulty): R
       const cheap = (card.stars ?? 9) <= 3 || card.id === 'N10'
       if (diff === 'easy' && !cheap) continue
       if (defender.position === 'attack') {
-        // 返り討ち(攻撃側が死ぬ)になるなら強化
+        // v1.6: 上回れば自分のモンスターを守り、差分を相手ライフに跳ね返せる
         if (attackerValue > defValue && newValue > attackerValue) return { type: 'boost', handIdx: c.handIdx }
         // 相打ちで自分の主力を守る
         if (diff === 'hard' && attackerValue === defValue && newValue > attackerValue && atkOf(defender) >= 1500) {
           return { type: 'boost', handIdx: c.handIdx }
         }
       } else {
-        // 守備: 破壊を防げるなら強化(被ダメなしなので安いカード限定)
-        if (attackerValue > defValue && newValue >= attackerValue && cheap) {
+        // v1.6: 守備の反撃 — 守備力が上回れば攻撃側を破壊できる。
+        // 反撃キルは安いカード、または攻撃側が1500以上なら高コストでも見合う
+        if (attackerValue > defValue && newValue > attackerValue && (cheap || attackerValue >= 1500)) {
+          return { type: 'boost', handIdx: c.handIdx }
+        }
+        // 同値で止めるだけ(破壊もダメージも無し)なら安いカード限定
+        if (attackerValue > defValue && newValue === attackerValue && cheap) {
           return { type: 'boost', handIdx: c.handIdx }
         }
       }
