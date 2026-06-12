@@ -328,11 +328,9 @@ export function nextAttack(
       if (diff === 'hard') {
         if (defender.position === 'attack') {
           // v1.6: 攻撃表示への攻撃は負けても破壊されないローリスク。
-          // 素で勝てる/強化込みで勝てるなら攻撃、1500以上との相打ちも許容
+          // 素で勝てる/強化込みで勝てるなら攻撃(同値は双方破壊なしで無意味なので攻撃しない)
           if (atk > dValue || (planBoost > 0 && atk + planBoost > dValue)) {
             if (!best || score > best.score) best = { target: t, score }
-          } else if (atk === dValue && dValue >= 1500) {
-            if (!best || dValue * 0.3 > best.score) best = { target: t, score: dValue * 0.3 }
           }
         } else if (!oppCanReact || desperate) {
           // 守備表示でも相手がリアクション不能(または膠着がデッキ切れ負けに繋がる)なら、
@@ -351,15 +349,8 @@ export function nextAttack(
           // 打点差がほとんどない壁には攻撃しない(反撃キル回避)
         }
       } else {
-        // 易・普通: 従来どおり素の値で勝てる時のみ
-        if (defender.position === 'attack') {
-          const dAtk = dValue
-          if (atk > dAtk) {
-            if (!best || score > best.score) best = { target: t, score }
-          } else if (atk === dAtk && diff !== 'easy' && dAtk >= 1500) {
-            if (!best || dAtk * 0.3 > best.score) best = { target: t, score: dAtk * 0.3 }
-          }
-        } else if (atk > dValue) {
+        // 易・普通: 素の値で勝てる時のみ(同値は双方破壊なしのため攻撃しない)
+        if (atk > dValue) {
           if (!best || score > best.score) best = { target: t, score }
         }
       }
@@ -457,7 +448,7 @@ export function decideBoost(s: GameState, me: PlayerIdx, diff: Difficulty): numb
 
   if (margin > 0) return null // すでに勝っている
 
-  // 易・普通: 負け・相打ちの状況なら安いカードでひっくり返す
+  // 易・普通: 負け・同値の状況なら安いカードで上回る
   for (const c of candidates) {
     if (atk + c.value > defValue) {
       // 易は★2以下(または鬼火)しか切らない
@@ -568,11 +559,8 @@ export function decideReaction(s: GameState, me: PlayerIdx, diff: Difficulty): R
       if (diff === 'easy' && !cheap) continue
       if (defender.position === 'attack') {
         // v1.6: 上回れば自分のモンスターを守り、差分を相手ライフに跳ね返せる
+        // (同値は双方破壊なしになったため、相打ち回避の強化は不要)
         if (attackerValue > defValue && newValue > attackerValue) return { type: 'boost', handIdx: c.handIdx }
-        // 相打ちで自分の主力を守る
-        if (diff === 'hard' && attackerValue === defValue && newValue > attackerValue && atkOf(defender) >= 1500) {
-          return { type: 'boost', handIdx: c.handIdx }
-        }
       } else {
         // v1.6: 守備の反撃 — 守備力が上回れば攻撃側を破壊できる。
         // 反撃キルは安いカード、または攻撃側が1500以上なら高コストでも見合う

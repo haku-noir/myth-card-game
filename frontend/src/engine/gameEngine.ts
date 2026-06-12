@@ -1064,8 +1064,10 @@ function resolveBattle(d: D, battle: BattleContext) {
       log(d, `${d.players[oppIdx].name}に${diff}ダメージ(残り${Math.max(0, d.players[oppIdx].life)})`)
       if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     } else if (atk === dAtk) {
-      destroyMonster(d, oppIdx, battle.target, '戦闘')
-      destroyMonster(d, me, battle.attackerZone, '戦闘')
+      // v1.6: 同値はどちらも破壊されない(攻vs守と同じ扱い)
+      log(d, '攻撃力同値。どちらも破壊されない')
+      if (attackerIsMedusa) defender.destroyAtEndOfTurn = true
+      if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     } else {
       // v1.6: 攻撃表示への攻撃で負けても攻撃側は破壊されない(差分ダメージのみ)
       const diff = dAtk - atk
