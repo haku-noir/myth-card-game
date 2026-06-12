@@ -144,6 +144,10 @@ export const canEnterBattle = (s: GameState): boolean =>
 export const effectiveAtk = (m: FieldMonster): number =>
   Math.max(0, (m.card.atk ?? 0) + m.buffs.reduce((sum, b) => sum + b.amount, 0))
 
+/** 実効守備力(期限付きバフ込み・0未満は0)。v1.6: 草薙剣・毒酒が守備力にも効く */
+export const effectiveDef = (m: FieldMonster): number =>
+  Math.max(0, (m.card.def ?? 0) + m.buffs.reduce((sum, b) => sum + (b.defAmount ?? 0), 0))
+
 function destroyMonster(d: D, owner: PlayerIdx, zone: number, cause: string) {
   const m = d.players[owner].monsters[zone]
   if (!m) return
@@ -443,11 +447,16 @@ function usableTrapZones(d: D, owner: PlayerIdx, trigger: TrapTrigger): number[]
       if (id === 'SR10') zones.push(z) // 落とし穴
     } else {
       if (id === 'N24' || id === 'R14' || id === 'N28') zones.push(z) // 金縛り・神隠し・砂かけ婆
-      if (id === 'UR5') zones.push(z) // アイギスの盾
+      if (id === 'UR5') {
+        // アイギスの盾: 自分の場にモンスターがいない場合のみ(v1.6)
+        if (p.monsters.every((m) => m === null)) zones.push(z)
+      }
       if (id === 'R12') {
-        // 背水の陣: 自分の場が空・手札にモンスター・(直接攻撃時のみ成立)
+        // 背水の陣: 自分の場が空・手札にレベル以下のモンスター(v1.6)・(直接攻撃時のみ成立)
         const fieldEmpty = p.monsters.every((m) => m === null)
-        const hasHandMonster = p.hand.some((c) => c.type === 'monster')
+        const hasHandMonster = p.hand.some(
+          (c) => c.type === 'monster' && (c.stars ?? 99) <= p.level,
+        )
         if (fieldEmpty && hasHandMonster && trigger.target === 'direct') zones.push(z)
       }
     }
@@ -589,10 +598,15 @@ export function respondTarget(s: GameState, choice: TargetOption | null): GameSt
         return
       }
       case 'R12': {
-        // 背水の陣: 選んだモンスターを守備表示で場に出し、攻撃をそのモンスターへ
+        // 背水の陣: 選んだレベル以下のモンスターを守備表示で場に出し、攻撃をそのモンスターへ
         const card = p.hand[choice.index]
         const attackerZone = pend.ctx?.attackerZone
-        if (card && card.type === 'monster' && attackerZone !== undefined) {
+        if (
+          card &&
+          card.type === 'monster' &&
+          (card.stars ?? 99) <= p.level &&
+          attackerZone !== undefined
+        ) {
           p.hand.splice(choice.index, 1)
           const zone = placeMonster(d, me, card, 'defense')
           log(d, `${card.name}を守備表示で場に出した。攻撃はこのモンスターへ向かう`)
@@ -681,11 +695,11 @@ export function castMagic(s: GameState, handIdx: number, target?: TargetOption):
         if (target) destroyMonster(d, other(me), target.index, '鬼退治')
         break
       case 'N20': {
-        // 草薙剣: 次の相手ターンの終了時まで+500
+        // 草薙剣: 次の相手ターンの終了時まで攻守+500(v1.6)
         const m = target ? p.monsters[target.index] : null
         if (m) {
-          m.buffs.push({ amount: 500, expiresAfterTurn: d.turnCount + 1 })
-          log(d, `${m.card.name}の攻撃力+500(次の相手ターン終了時まで)`)
+          m.buffs.push({ amount: 500, defAmount: 500, expiresAfterTurn: d.turnCount + 1 })
+          log(d, `${m.card.name}の攻撃力と守備力+500(次の相手ターン終了時まで)`)
         }
         break
       }
@@ -708,18 +722,18 @@ export function castMagic(s: GameState, handIdx: number, target?: TargetOption):
         break
       }
       case 'N23':
-        // 軍配: ターン終了時まで+300
+        // 軍配: ターン終了時まで+500(v1.6で+300から強化)
         for (const m of p.monsters) {
-          if (m) m.buffs.push({ amount: 300, expiresAfterTurn: d.turnCount })
+          if (m) m.buffs.push({ amount: 500, expiresAfterTurn: d.turnCount })
         }
-        log(d, '自分の全モンスターの攻撃力+300(ターン終了時まで)')
+        log(d, '自分の全モンスターの攻撃力+500(ターン終了時まで)')
         break
       case 'N27': {
-        // 神便鬼毒酒: 次の相手ターンの終了時まで-700
+        // 神便鬼毒酒: 次の相手ターンの終了時まで攻守-700(v1.6)
         const m = target ? opp.monsters[target.index] : null
         if (m) {
-          m.buffs.push({ amount: -700, expiresAfterTurn: d.turnCount + 1 })
-          log(d, `${m.card.name}の攻撃力-700(次の相手ターン終了時まで)`)
+          m.buffs.push({ amount: -700, defAmount: -700, expiresAfterTurn: d.turnCount + 1 })
+          log(d, `${m.card.name}の攻撃力と守備力-700(次の相手ターン終了時まで)`)
         }
         break
       }
@@ -738,12 +752,14 @@ export function castMagic(s: GameState, handIdx: number, target?: TargetOption):
         break
       }
       case 'R10':
-        p.life += 1500
-        log(d, `ライフを1500回復(→${p.life})`)
+        p.life += 2500
+        log(d, `ライフを2500回復(→${p.life})`)
         break
       case 'UR4':
+        // 天罰: お互いの場のモンスターを全て破壊(v1.6)
         for (let z = 0; z < MONSTER_ZONES; z++) {
           if (opp.monsters[z]) destroyMonster(d, other(me), z, '天罰')
+          if (p.monsters[z]) destroyMonster(d, me, z, '天罰')
         }
         break
       case 'SR7': {
@@ -981,10 +997,10 @@ export function respondReaction(s: GameState, choice: DefenderReactionChoice): G
         return
       }
       case 'R12': {
-        // 背水の陣: 手札からモンスターを選んで場に出す(必須選択)
+        // 背水の陣: 手札からレベル以下のモンスターを選んで守備表示で出す(必須選択)
         const options = p.hand
           .map((c, i) => ({ card: c, i }))
-          .filter(({ card }) => card.type === 'monster')
+          .filter(({ card }) => card.type === 'monster' && (card.stars ?? 99) <= p.level)
           .map(({ i }) => ({ area: 'hand' as const, index: i }))
         if (options.length === 0) {
           resolveBattle(d, battle)
@@ -1051,14 +1067,15 @@ function resolveBattle(d: D, battle: BattleContext) {
       destroyMonster(d, oppIdx, battle.target, '戦闘')
       destroyMonster(d, me, battle.attackerZone, '戦闘')
     } else {
+      // v1.6: 攻撃表示への攻撃で負けても攻撃側は破壊されない(差分ダメージのみ)
       const diff = dAtk - atk
-      destroyMonster(d, me, battle.attackerZone, '戦闘')
       d.players[me].life -= diff
-      log(d, `${d.players[me].name}に${diff}ダメージ(残り${Math.max(0, d.players[me].life)})`)
+      log(d, `攻撃は跳ね返された! ${d.players[me].name}に${diff}ダメージ(残り${Math.max(0, d.players[me].life)})`)
       if (attackerIsMedusa) defender.destroyAtEndOfTurn = true
+      if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     }
   } else {
-    const dDef = (defender.card.def ?? 0) + battle.defenderBoost
+    const dDef = effectiveDef(defender) + battle.defenderBoost
     log(
       d,
       `戦闘: ${meName}の${attacker.card.name}(${atkLabel}) × ${oppName}の${defender.card.name}(${defLabel(dDef, '守')})`,
@@ -1067,11 +1084,12 @@ function resolveBattle(d: D, battle: BattleContext) {
       destroyMonster(d, oppIdx, battle.target, '戦闘')
       if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     } else if (atk < dDef) {
+      // v1.6: 守備の反撃 — 守備力を下回ると攻撃側が破壊される
       const diff = dDef - atk
+      destroyMonster(d, me, battle.attackerZone, '守備の反撃')
       d.players[me].life -= diff
-      log(d, `守備は固い! ${d.players[me].name}に${diff}ダメージ(残り${Math.max(0, d.players[me].life)})`)
+      log(d, `${d.players[me].name}に${diff}ダメージ(残り${Math.max(0, d.players[me].life)})`)
       if (attackerIsMedusa) defender.destroyAtEndOfTurn = true
-      if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     } else {
       log(d, '攻守同値。どちらも破壊されない')
       if (attackerIsMedusa) defender.destroyAtEndOfTurn = true

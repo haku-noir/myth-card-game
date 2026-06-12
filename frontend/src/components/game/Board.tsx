@@ -736,7 +736,10 @@ function BattleInfo({ game, mySeat, battle }: { game: GameState; mySeat: PlayerI
     boost: number,
   ) => {
     const base = mode === 'attack' ? (m.card.atk ?? 0) : (m.card.def ?? 0)
-    const buffSum = mode === 'attack' ? m.buffs.reduce((s, b) => s + b.amount, 0) : 0
+    const buffSum = m.buffs.reduce(
+      (s, b) => s + (mode === 'attack' ? b.amount : (b.defAmount ?? 0)),
+      0,
+    )
     const total = Math.max(0, base + buffSum) + boost
     return (
       <div className="flex flex-col items-center gap-1">
@@ -793,15 +796,26 @@ function BattleInfo({ game, mySeat, battle }: { game: GameState; mySeat: PlayerI
   )
 }
 
-/** 期限付きバフ/デバフの合計をバッジ表示(+は緑、-は赤) */
+/** 期限付きバフ/デバフの合計をバッジ表示(+は緑、-は赤)。攻守で値が違う時は両方表示 */
 function BuffBadge({ m }: { m: FieldMonster }) {
-  const net = m.buffs.reduce((sum, b) => sum + b.amount, 0)
-  if (net === 0) return null
+  const atkNet = m.buffs.reduce((sum, b) => sum + b.amount, 0)
+  const defNet = m.buffs.reduce((sum, b) => sum + (b.defAmount ?? 0), 0)
+  if (atkNet === 0 && defNet === 0) return null
+  const fmt = (n: number) => (n > 0 ? `+${n}` : `${n}`)
+  const label =
+    atkNet === defNet
+      ? `攻守${fmt(atkNet)}`
+      : defNet === 0
+        ? fmt(atkNet)
+        : atkNet === 0
+          ? `守${fmt(defNet)}`
+          : `${fmt(atkNet)}/守${fmt(defNet)}`
+  const positive = (atkNet !== 0 ? atkNet : defNet) > 0
   return (
     <span
-      className={`absolute -top-1 right-0 rounded px-1 text-[9px] font-bold ${net > 0 ? 'bg-emerald-600' : 'bg-red-700'}`}
+      className={`absolute -top-1 right-0 rounded px-1 text-[9px] font-bold ${positive ? 'bg-emerald-600' : 'bg-red-700'}`}
     >
-      {net > 0 ? `+${net}` : net}
+      {label}
     </span>
   )
 }

@@ -9,9 +9,12 @@ export const TRAP_ZONES = 3
 export const INITIAL_LIFE = 8000 // v1.1で6000→8000
 export const INITIAL_HAND = 5
 
-/** 期限付きの攻撃力補正(プラス=強化、マイナス=弱体化) */
+/** 期限付きの能力補正(プラス=強化、マイナス=弱体化) */
 export interface BuffEntry {
+  /** 攻撃力への補正 */
   amount: number
+  /** 守備力への補正(草薙剣・神便鬼毒酒は攻守両方に効く。v1.6) */
+  defAmount?: number
   /** このターン数の終了時に失効する(例: 軍配=現在ターン、草薙剣=次の相手ターン) */
   expiresAfterTurn: number
 }
