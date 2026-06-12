@@ -325,6 +325,12 @@ export function nextAttack(
           if (atk > dValue || (planBoost > 0 && atk + planBoost > dValue)) {
             if (!best || score > best.score) best = { target: t, score }
           }
+        } else if (defender.position === 'defense') {
+          // 守備表示への攻撃は返り討ち(攻撃側破壊)がルール上起こり得ない。
+          // 最悪でも強化・砂かけ婆で止められて差分の自傷ダメージのみなので、素で勝てれば攻める
+          if (atk > dValue) {
+            if (!best || score > best.score) best = { target: t, score }
+          }
         } else {
           // 相手はリアクション可能: 返り討ちを警戒する
           const margin = atk - dValue
@@ -401,6 +407,14 @@ export function decideBoost(s: GameState, me: PlayerIdx, diff: Difficulty): numb
   const margin = atk - defValue
 
   if (diff === 'hard') {
+    // 守備表示相手は返り討ちが無いため、マージン確保の強化は浪費(負け宣言はそもそもしない)
+    if (defender.position === 'defense') {
+      if (margin > 0) return null
+      for (const c of candidates) {
+        if (atk + c.value > defValue) return c.handIdx
+      }
+      return null
+    }
     // 難: 相手のリアクション(手札強化・伏せ罠)を見越して安全マージンを確保する。
     // nextAttackがこの強化を前提に攻撃宣言している
     const oppTrapCount = s.players[oppIdx].traps.filter(Boolean).length
