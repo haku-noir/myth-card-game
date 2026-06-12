@@ -59,6 +59,9 @@ metadata:
     で開封→構築→保存なしで対戦開始(DeckBuilderのhandleSealedStart)
   - デッキ構築の「おまかせ構築」: buildCpuDeckをbuildDeckIndices(インデックス返却)
     に分離して共用(編集モードはcardById共有参照のためインデックス必須)
+- [x] CPUアルゴリズムのドキュメント化 — 完了 (コミット 573cb6a)
+  - docs/CPUアルゴリズム.md: 全判断ロジックと難易度別閾値の一覧。
+    cpu.ts/cpuDeck.tsの閾値を調整したら本ドキュメントも更新すること
 - [x] hard CPU改善 — 完了 (コミット 0c2d2d4)
   - ユーザー指摘「強化込み攻撃が返り討ちの原因」を反映:
     安全マージン600(伏せ有り700)、リアクション不能時のみ強化込み攻撃、
