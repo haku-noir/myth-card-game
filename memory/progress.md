@@ -54,6 +54,11 @@ metadata:
   - 保存デッキはmigrate-deck-ids.tsで移行済み
   - 検証: 500ゲーム正常、easy vs hard = 26-74、PvP/ドラフト回帰OK
   - ゲーム名は「星の階」に変更済み
+- [x] CPU戦シールド戦 + おまかせ構築 — 完了 (コミット 40514fa, cbcfc33)
+  - CPU戦の使用デッキ選択に「シールド戦」: /pack-opening?battle=cpu&difficulty=...
+    で開封→構築→保存なしで対戦開始(DeckBuilderのhandleSealedStart)
+  - デッキ構築の「おまかせ構築」: buildCpuDeckをbuildDeckIndices(インデックス返却)
+    に分離して共用(編集モードはcardById共有参照のためインデックス必須)
 - [x] hard CPU改善 — 完了 (コミット 0c2d2d4)
   - ユーザー指摘「強化込み攻撃が返り討ちの原因」を反映:
     安全マージン600(伏せ有り700)、リアクション不能時のみ強化込み攻撃、
