@@ -328,8 +328,8 @@ export function nextAttack(
       if (diff === 'hard') {
         if (defender.position === 'attack') {
           // v1.6: 攻撃表示への攻撃は負けても破壊されないローリスク。
-          // 素で勝てる/強化込みで勝てるなら攻撃(同値は双方破壊なしで無意味なので攻撃しない)
-          if (atk > dValue || (planBoost > 0 && atk + planBoost > dValue)) {
+          // 同値でも攻撃側が押し切って破壊できるため >= で攻撃
+          if (atk >= dValue || (planBoost > 0 && atk + planBoost >= dValue)) {
             if (!best || score > best.score) best = { target: t, score }
           }
         } else if (!oppCanReact || desperate) {
@@ -349,8 +349,8 @@ export function nextAttack(
           // 打点差がほとんどない壁には攻撃しない(反撃キル回避)
         }
       } else {
-        // 易・普通: 素の値で勝てる時のみ(同値は双方破壊なしのため攻撃しない)
-        if (atk > dValue) {
+        // 易・普通: 攻撃表示は同値でも押し切れるため >=、守備表示は > で攻撃
+        if (defender.position === 'attack' ? atk >= dValue : atk > dValue) {
           if (!best || score > best.score) best = { target: t, score }
         }
       }
@@ -407,12 +407,12 @@ export function decideBoost(s: GameState, me: PlayerIdx, diff: Difficulty): numb
   const margin = atk - defValue
 
   if (diff === 'hard') {
-    // v1.6: 攻撃表示相手は負けても破壊されないため、強化は「勝ち(破壊+ダメージ)を取る」
-    // ためだけに使う。負けているなら最小コストで逆転
+    // v1.6: 攻撃表示相手は負けても破壊されないため、強化は「破壊を取る」ためだけに使う。
+    // 同値でも押し切れるので >= に届く最小コストで逆転
     if (defender.position === 'attack') {
-      if (margin > 0) return null
+      if (margin >= 0) return null
       for (const c of candidates) {
-        if (atk + c.value > defValue) return c.handIdx
+        if (atk + c.value >= defValue) return c.handIdx
       }
       return null
     }
@@ -446,11 +446,13 @@ export function decideBoost(s: GameState, me: PlayerIdx, diff: Difficulty): numb
     return null
   }
 
-  if (margin > 0) return null // すでに勝っている
+  // 攻撃表示相手は同値でも押し切れる(>=)、守備表示相手は上回る必要がある(>)
+  const wins = (v: number) => (defender.position === 'attack' ? v >= defValue : v > defValue)
+  if (wins(atk)) return null // すでに勝っている
 
-  // 易・普通: 負け・同値の状況なら安いカードで上回る
+  // 易・普通: 負けの状況なら安いカードで勝ちに届かせる
   for (const c of candidates) {
-    if (atk + c.value > defValue) {
+    if (wins(atk + c.value)) {
       // 易は★2以下(または鬼火)しか切らない
       const card = p.hand[c.handIdx]
       if (diff === 'easy' && (card.stars ?? 9) > 2 && card.id !== 'N03') continue
@@ -522,8 +524,8 @@ export function decideReaction(s: GameState, me: PlayerIdx, diff: Difficulty): R
         break
       }
       case 'N28': {
-        // 砂かけ婆: -600で戦闘がひっくり返る(守備表示なら反撃キルに繋がる)、または直撃の軽減
-        if (defender && attackerValue > defValue && attackerValue - 600 < defValue) {
+        // 砂かけ婆: -600で破壊を免れる(守備表示なら反撃キルにも繋がる)、または直撃の軽減
+        if (defender && attackerValue >= defValue && attackerValue - 600 < defValue) {
           return { type: 'trap', zone }
         }
         if (battle.target === 'direct' && (lethal || expectedDmg >= 1800)) {
@@ -558,16 +560,16 @@ export function decideReaction(s: GameState, me: PlayerIdx, diff: Difficulty): R
       const cheap = (card.stars ?? 9) <= 3 || card.id === 'N10'
       if (diff === 'easy' && !cheap) continue
       if (defender.position === 'attack') {
-        // v1.6: 上回れば自分のモンスターを守り、差分を相手ライフに跳ね返せる
-        // (同値は双方破壊なしになったため、相打ち回避の強化は不要)
-        if (attackerValue > defValue && newValue > attackerValue) return { type: 'boost', handIdx: c.handIdx }
+        // v1.6: 同値でも攻撃側に押し切られる(>=で破壊)。上回れば自分のモンスターを
+        // 守り、差分を相手ライフに跳ね返せる
+        if (attackerValue >= defValue && newValue > attackerValue) return { type: 'boost', handIdx: c.handIdx }
       } else {
-        // v1.6: 守備の反撃 — 守備力が上回れば攻撃側を破壊できる。
+        // v1.6: 守備の反撃 — 守備力が攻撃力を上回れば攻撃側を破壊できる(自分は残る)。
         // 反撃キルは安いカード、または攻撃側が1500以上なら高コストでも見合う
-        if (attackerValue > defValue && newValue > attackerValue && (cheap || attackerValue >= 1500)) {
+        if (attackerValue >= defValue && newValue > attackerValue && (cheap || attackerValue >= 1500)) {
           return { type: 'boost', handIdx: c.handIdx }
         }
-        // 同値で止めるだけ(破壊もダメージも無し)なら安いカード限定
+        // 同値(相討ち=攻撃側を道連れ)に持ち込むだけなら安いカード限定
         if (attackerValue > defValue && newValue === attackerValue && cheap) {
           return { type: 'boost', handIdx: c.handIdx }
         }

@@ -1064,9 +1064,9 @@ function resolveBattle(d: D, battle: BattleContext) {
       log(d, `${d.players[oppIdx].name}に${diff}ダメージ(残り${Math.max(0, d.players[oppIdx].life)})`)
       if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     } else if (atk === dAtk) {
-      // v1.6: 同値はどちらも破壊されない(攻vs守と同じ扱い)
-      log(d, '攻撃力同値。どちらも破壊されない')
-      if (attackerIsMedusa) defender.destroyAtEndOfTurn = true
+      // v1.6: 攻撃される側の攻撃表示は攻撃能力がない扱い → 同値は攻撃側が押し切る
+      log(d, '攻撃力同値。攻撃側が押し切った')
+      destroyMonster(d, oppIdx, battle.target, '戦闘')
       if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
     } else {
       // v1.6: 攻撃表示への攻撃で負けても攻撃側は破壊されない(差分ダメージのみ)
@@ -1093,9 +1093,10 @@ function resolveBattle(d: D, battle: BattleContext) {
       log(d, `${d.players[me].name}に${diff}ダメージ(残り${Math.max(0, d.players[me].life)})`)
       if (attackerIsMedusa) defender.destroyAtEndOfTurn = true
     } else {
-      log(d, '攻守同値。どちらも破壊されない')
-      if (attackerIsMedusa) defender.destroyAtEndOfTurn = true
-      if (defenderIsMedusa) attacker.destroyAtEndOfTurn = true
+      // v1.6: 守備表示は待ち構えている扱い → 攻守同値は刺し違えて両者破壊
+      log(d, '攻守同値。相討ちで両者破壊')
+      destroyMonster(d, oppIdx, battle.target, '戦闘')
+      destroyMonster(d, me, battle.attackerZone, '戦闘')
     }
   }
   checkLifeWinner(d)
